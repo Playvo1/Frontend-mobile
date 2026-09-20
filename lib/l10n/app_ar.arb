@@ -1,0 +1,67 @@
+{
+  "@@locale": "ar",
+
+  "appName": "Playvo",
+  "languageLabel": "العربية",
+
+  "emailHint": "البريد الإلكتروني",
+  "passwordHint": "كلمة المرور",
+  "orLabel": "أو",
+  "continueWithGoogle": "المتابعة باستخدام Google",
+
+  "loginWelcome": "مرحباً بعودتك!",
+  "loginSubtitle": "سجل الدخول لمتابعة رحلتك الرياضية",
+  "forgotPassword": "نسيت كلمة المرور؟",
+  "loginButton": "تسجيل الدخول",
+  "noAccount": "ليس لديك حساب؟ ",
+  "createAccountLink": "إنشاء حساب جديد",
+
+  "signupTitle": "إنشاء حساب جديد",
+  "signupSubtitle": "انضم إلى Playvo واحجز ملاعبك المفضلة بسهولة",
+  "fullNameHint": "الاسم الكامل",
+  "phoneHint": "رقم الهاتف (اختياري)",
+  "confirmPasswordHint": "تأكيد كلمة المرور",
+  "createAccountButton": "إنشاء حساب",
+  "haveAccount": "لديك حساب بالفعل؟ ",
+  "loginLink": "تسجيل الدخول",
+
+  "otpTitle": "تحقق من حسابك",
+  "otpSubtitle": "لقد أرسلنا رمز التحقق إلى بريدك الإلكتروني\n{email}",
+  "resendIn": "يمكنك طلب رمز جديد خلال {time}",
+  "resendNow": "إعادة إرسال الرمز",
+  "verifyButton": "تحقق",
+  "continueButton": "متابعة",
+  "otpIncomplete": "الرجاء إدخال الرمز كاملاً (6 أرقام)",
+  "codeResent": "تم إرسال رمز جديد",
+
+  "forgotTitle": "نسيت كلمة المرور",
+  "forgotSubtitle": "أدخل بريدك الإلكتروني وسيرسل لك رمز لإعادة تعيين كلمة المرور",
+  "sendCodeButton": "إرسال رمز التحقق",
+  "backToLogin": "رجوع لتسجيل الدخول",
+
+  "resetTitle": "إعادة تعيين كلمة المرور",
+  "resetSubtitle": "أدخل كلمة المرور الجديدة لحسابك",
+  "newPasswordHint": "كلمة المرور الجديدة",
+  "confirmNewPasswordHint": "تأكيد كلمة المرور الجديدة",
+  "resetButton": "إعادة تعيين كلمة المرور",
+
+  "emailRequired": "الرجاء إدخال البريد الإلكتروني",
+  "emailInvalid": "صيغة البريد الإلكتروني غير صحيحة",
+  "passwordRequired": "الرجاء إدخال كلمة المرور",
+  "passwordTooShort": "كلمة المرور يجب أن تكون 8 أحرف على الأقل",
+  "passwordNeedsLetterAndDigit": "كلمة المرور يجب أن تحتوي على حرف ورقم على الأقل",
+  "passwordsDontMatch": "كلمتا المرور غير متطابقتين",
+  "fullNameRequired": "الرجاء إدخال الاسم الكامل",
+  "phoneInvalid": "رقم الهاتف غير صحيح",
+
+  "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+  "accountLocked": "تم تجاوز عدد محاولات تسجيل الدخول المسموح بها",
+  "attemptsRemaining": "{count, plural, =1{تبقت محاولة واحدة} =2{تبقت محاولتان} few{تبقى {count} محاولات} other{تبقى {count} محاولة}}",
+  "tryAgainIn": "حاول مرة أخرى بعد {time}",
+
+  "errorNoInternet": "لا يوجد اتصال بالإنترنت. تحقق من الشبكة وحاول مرة أخرى.",
+  "errorTimeout": "الخادم يستغرق وقتاً طويلاً للرد. حاول مرة أخرى.",
+  "errorServer": "حدث خطأ لدينا. الرجاء المحاولة لاحقاً.",
+  "errorUnexpected": "حدث خطأ غير متوقع. الرجاء المحاولة مرة أخرى.",
+  "logout": "تسجيل الخروج"
+}

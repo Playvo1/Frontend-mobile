@@ -1,0 +1,75 @@
+{
+  "@@locale": "en",
+
+  "appName": "Playvo",
+  "languageLabel": "English",
+
+  "emailHint": "Email",
+  "passwordHint": "Password",
+  "orLabel": "or",
+  "continueWithGoogle": "Continue with Google",
+
+  "loginWelcome": "Welcome back!",
+  "loginSubtitle": "Log in to continue your sports journey",
+  "forgotPassword": "Forgot password?",
+  "loginButton": "Log in",
+  "noAccount": "Don't have an account? ",
+  "createAccountLink": "Create one",
+
+  "signupTitle": "Create a new account",
+  "signupSubtitle": "Join Playvo and book your favorite venues easily",
+  "fullNameHint": "Full name",
+  "phoneHint": "Phone number (optional)",
+  "confirmPasswordHint": "Confirm password",
+  "createAccountButton": "Create account",
+  "haveAccount": "Already have an account? ",
+  "loginLink": "Log in",
+
+  "otpTitle": "Verify your account",
+  "otpSubtitle": "We sent a verification code to your email\n{email}",
+  "@otpSubtitle": {
+    "placeholders": { "email": { "type": "String" } }
+  },
+  "resendIn": "You can request a new code in {time}",
+  "@resendIn": {
+    "placeholders": { "time": { "type": "String" } }
+  },
+  "resendNow": "Resend code",
+  "verifyButton": "Verify",
+  "continueButton": "Continue",
+  "otpIncomplete": "Please enter the full 6-digit code",
+  "codeResent": "A new code has been sent",
+
+  "forgotTitle": "Forgot password",
+  "forgotSubtitle": "Enter your email and we'll send you a code to reset your password",
+  "sendCodeButton": "Send verification code",
+  "backToLogin": "Back to login",
+
+  "resetTitle": "Reset password",
+  "resetSubtitle": "Enter a new password for your account",
+  "newPasswordHint": "New password",
+  "confirmNewPasswordHint": "Confirm new password",
+  "resetButton": "Reset password",
+
+  "emailRequired": "Please enter your email",
+  "emailInvalid": "Invalid email format",
+  "passwordRequired": "Please enter your password",
+  "passwordTooShort": "Password must be at least 8 characters",
+  "passwordNeedsLetterAndDigit": "Password must contain at least one letter and one digit",
+  "passwordsDontMatch": "Passwords do not match",
+  "fullNameRequired": "Please enter your full name",
+  "phoneInvalid": "Invalid phone number",
+
+  "invalidCredentials": "Incorrect email or password",
+  "accountLocked": "You have exceeded the number of allowed login attempts",
+  "attemptsRemaining": "{count, plural, =1{1 attempt remaining} other{{count} attempts remaining}}",
+  "@attemptsRemaining": {"placeholders": {"count": {"type": "int"}}},
+  "tryAgainIn": "Try again in {time}",
+  "@tryAgainIn": {"placeholders": {"time": {"type": "String"}}},
+
+  "errorNoInternet": "No internet connection. Check your network and try again.",
+  "errorTimeout": "The server is taking too long to respond. Please try again.",
+  "errorServer": "Something went wrong on our side. Please try again later.",
+  "errorUnexpected": "An unexpected error occurred. Please try again.",
+  "logout": "Log out"
+}

@@ -1,0 +1,9 @@
+# Configuration for `flutter gen-l10n` (Guidelines 4.1 / 5.3).
+# The generated AppLocalizations class is written next to the .arb files.
+arb-dir: lib/l10n
+template-arb-file: app_en.arb
+output-localization-file: app_localizations.dart
+output-dir: lib/l10n
+output-class: AppLocalizations
+synthetic-package: false
+nullable-getter: false
