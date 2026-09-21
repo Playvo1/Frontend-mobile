@@ -25,28 +25,43 @@ class AuthService {
     String? phone,
   }) {
     return _client.post<RegistrationResult>(
-      '/auth/register',
+      '/auth/register/player',
       body: <String, dynamic>{
         'name': name,
         'email': email,
         'password': password,
+        'password_confirmation': password,
+
+        
         if (phone != null && phone.isNotEmpty) 'phone': phone,
       },
       parseData: (dynamic data) =>
           RegistrationResult.fromJson(data as Map<String, dynamic>),
     );
   }
+  /// POST /auth/send-otp
+   Future<ApiResponse<void>> sendOtp(String email) {
+  return _client.post<void>(
+    '/auth/send-otp',
+    body: <String, dynamic>{
+      'email': email,
+    },
+  );
+}
 
   /// POST /auth/verify — confirms the emailed code.
-  Future<ApiResponse<void>> verifyEmail({
-    required String email,
-    required String code,
-  }) {
-    return _client.post<void>(
-      '/auth/verify',
-      body: <String, dynamic>{'email': email, 'code': code},
-    );
-  }
+ Future<ApiResponse<void>> verifyEmail({
+  required String email,
+  required String code,
+}) {
+  return _client.post<void>(
+    '/auth/verify-otp',
+    body: <String, dynamic>{
+      'email': email,
+      'otp_code': code,
+    },
+  );
+}
 
   /// POST /auth/login — on success the token is stored before returning, so
   /// callers never handle the credential themselves.
@@ -71,7 +86,7 @@ class AuthService {
   Future<ApiResponse<AuthSession>> loginWithGoogle(String idToken) async {
     final ApiResponse<AuthSession> response =
         await _client.post<AuthSession>(
-      '/auth/login/google',
+      '/auth/google',
       body: <String, dynamic>{'id_token': idToken},
       parseData: (dynamic data) =>
           AuthSession.fromJson(data as Map<String, dynamic>),
@@ -93,20 +108,34 @@ class AuthService {
   /// POST /auth/reset-password — needs the email and the code the player
   /// entered on the OTP screen, which is why both are carried forward
   /// through the flow rather than re-asked.
-  Future<ApiResponse<void>> resetPassword({
-    required String email,
-    required String code,
-    required String password,
-  }) {
-    return _client.post<void>(
-      '/auth/reset-password',
-      body: <String, dynamic>{
-        'email': email,
-        'code': code,
-        'password': password,
-      },
-    );
-  }
+ /// POST /auth/verify-reset-otp
+Future<ApiResponse<void>> verifyResetOtp({
+  required String email,
+  required String code,
+}) {
+  return _client.post<void>(
+    '/auth/verify-reset-otp',
+    body: <String, dynamic>{
+      'email': email,
+      'otp_code': code,
+    },
+  );
+}
+
+/// POST /auth/reset-password
+Future<ApiResponse<void>> resetPassword({
+  required String email,
+  required String password,
+}) {
+  return _client.post<void>(
+    '/auth/reset-password',
+    body: <String, dynamic>{
+      'email': email,
+      'password': password,
+      'password_confirmation': password,
+    },
+  );
+}
 
   /// GET /auth/me — used on launch to decide whether a stored token is
   /// still valid.

@@ -62,15 +62,14 @@ class AppRouter {
   /// The email and the verified code are carried in, because
   /// `POST /auth/reset-password` needs all three of email, code and the new
   /// password in one request (Guidelines 7.2).
-  static Future<void> toResetPassword(
-    BuildContext context, {
-    required String email,
-    required String code,
-  }) {
-    return Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => ResetPasswordScreen(email: email, code: code),
-      ),
-    );
-  }
+ static Future<void> toResetPassword(
+  BuildContext context, {
+  required String email,
+}) {
+  return Navigator.of(context).pushReplacement(
+    MaterialPageRoute<void>(
+      builder: (_) => ResetPasswordScreen(email: email),
+    ),
+  );
+}
 }

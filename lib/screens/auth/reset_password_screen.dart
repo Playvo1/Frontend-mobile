@@ -21,15 +21,13 @@ import '../../widgets/primary_button.dart';
 /// consumed here, not earlier.
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({
-    super.key,
-    required this.email,
-    required this.code,
-    this.authService,
-  });
+  super.key,
+  required this.email,
+  this.authService,
+});
 
-  final String email;
-  final String code;
-  final AuthService? authService;
+final String email;
+final AuthService? authService;
 
   @override
   State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
@@ -67,10 +65,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
     try {
       final ApiResponse<void> response = await _authService.resetPassword(
-        email: widget.email,
-        code: widget.code,
-        password: _passwordController.text,
-      );
+       email: widget.email,
+      password: _passwordController.text,
+   );
 
       if (!mounted) {
         return;
@@ -80,11 +77,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         return;
       }
       // An expired or already-used code comes back on the `code` field.
-      setState(
-        () => _errorMessage = response.errorFor('code') ??
-            response.errorFor('password') ??
-            response.message,
-      );
+     setState(
+       () => _errorMessage =
+      response.errorFor('password') ?? response.message,
+    );
     } on ApiException catch (exception) {
       if (!mounted) {
         return;
