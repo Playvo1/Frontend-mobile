@@ -10,7 +10,7 @@ class AppConfig {
   /// Always includes the `/api/v1` version prefix (Guidelines 2.2).
   static const String apiBaseUrl = String.fromEnvironment(
     'PLAYVO_API_BASE_URL',
-    defaultValue: 'https://api.playvo.app/api/v1',
+  defaultValue: 'http://10.166.0.178:8000/api/v1',
   );
 
   static const Duration requestTimeout = Duration(seconds: 20);
