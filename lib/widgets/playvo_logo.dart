@@ -18,7 +18,7 @@ class PlayvoLogo extends StatelessWidget {
     super.key,
     this.markHeight = 130,
     this.wordmarkSize = 30,
-    this.gap = -30,
+    this.gap,
   });
 
   final double markHeight;
@@ -27,7 +27,12 @@ class PlayvoLogo extends StatelessWidget {
   /// Fine-tuning for the distance between the mark and the wordmark.
   /// Negative values pull the word up; it is drawn, not laid out, so the
   /// widget's own height does not change.
-  final double gap;
+  ///
+  /// Left null it scales with [wordmarkSize], so a smaller logo keeps the
+  /// same lockup instead of the word sliding into the mark.
+  final double? gap;
+
+  double get _effectiveGap => gap ?? -wordmarkSize;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +47,7 @@ class PlayvoLogo extends StatelessWidget {
           errorBuilder: (_, __, ___) => SizedBox(height: markHeight),
         ),
         Transform.translate(
-          offset: Offset(0, gap),
+          offset: Offset(0, _effectiveGap),
           child: Text.rich(
             TextSpan(
               style: base?.copyWith(

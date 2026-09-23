@@ -26,6 +26,7 @@ dependencies:
 
   # UI
   google_fonts: ^6.2.1
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:
@@ -40,6 +41,7 @@ flutter:
 
   assets:
     - assets/logo/
+    - assets/venues/
 
   # Cairo is loaded at runtime by google_fonts. To make the first launch work
   # offline, download the Cairo .ttf weights (400/500/600/700) into

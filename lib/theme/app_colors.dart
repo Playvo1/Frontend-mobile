@@ -55,4 +55,9 @@ class AppColors {
   static const Color warning = Color(0xFFB77400);
   static const Color success = Color(0xFF1B7F4B);
   static const Color successBackground = Color(0xFFE8F5EE);
+
+  // The confirmation mark on the "password updated" screen.
+  // TODO(design): confirm against the Figma Source of Truth.
+  static const Color successAccent = Color(0xFF2E7DF6);
+  static const Color successAccentHalo = Color(0xFFD9E7FD);
 }

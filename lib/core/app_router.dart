@@ -4,6 +4,7 @@ import '../screens/auth/forgot_password_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/otp_verification_screen.dart';
 import '../screens/auth/reset_password_screen.dart';
+import '../screens/auth/reset_success_screen.dart';
 import '../screens/auth/signup_screen.dart';
 import '../screens/home_screen.dart';
 
@@ -62,15 +63,23 @@ class AppRouter {
   /// The email and the verified code are carried in, because
   /// `POST /auth/reset-password` needs all three of email, code and the new
   /// password in one request (Guidelines 7.2).
-  static Future<void> toResetPassword(
-    BuildContext context, {
-    required String email,
-    required String code,
-  }) {
-    return Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => ResetPasswordScreen(email: email, code: code),
-      ),
+ static Future<void> toResetPassword(
+  BuildContext context, {
+  required String email,
+}) {
+  return Navigator.of(context).pushReplacement(
+    MaterialPageRoute<void>(
+      builder: (_) => ResetPasswordScreen(email: email),
+    ),
+  );
+}
+
+  /// Shown once the password has actually been changed. The stack is
+  /// cleared so Back cannot return into the spent reset flow.
+  static Future<void> toResetSuccess(BuildContext context) {
+    return Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => const ResetSuccessScreen()),
+      (Route<dynamic> route) => false,
     );
   }
 }

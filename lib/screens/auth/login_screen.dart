@@ -1,7 +1,7 @@
 import 'dart:async';
-
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/material.dart';
-
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/api_exception.dart';
 import '../../core/api_response.dart';
 import '../../core/app_router.dart';
@@ -19,6 +19,11 @@ import '../../widgets/error_banner.dart';
 import '../../widgets/google_button.dart';
 import '../../widgets/or_divider.dart';
 import '../../widgets/primary_button.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+import '../../core/api_exception.dart';
+import '../../core/api_response.dart';
+import '../../models/auth_session.dart';
 
 /// Email + password sign-in, plus the Google entry point.
 ///
@@ -185,11 +190,68 @@ class _LoginScreenState extends State<LoginScreen> {
     return attempts == null ? null : l10n.attemptsRemaining(attempts);
   }
 
-  Future<void> _handleGoogleLogin() async {
-    // TODO(auth): obtain a Google ID token with google_sign_in, then call
-    // _authService.loginWithGoogle(idToken). The service and the endpoint
-    // are already in place.
+Future<void> _handleGoogleLogin() async {
+  setState(() {
+    _isSubmitting = true;
+    _errorMessage = null;
+  });
+
+  try {
+    final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+
+    await googleSignIn.initialize();
+
+    final GoogleSignInAccount account =
+        await googleSignIn.authenticate();
+
+    final GoogleSignInAuthentication authentication =
+        account.authentication;
+
+    final String? idToken = authentication.idToken;
+
+    if (idToken == null || idToken.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = 'Could not get Google ID token.';
+      });
+      return;
+    }
+
+    final ApiResponse<AuthSession> response =
+        await _authService.loginWithGoogle(idToken);
+
+    if (!mounted) return;
+
+    if (response.success) {
+      await AppRouter.toHomeAndClearStack(context);
+      return;
+    }
+
+    setState(() {
+      _errorMessage = response.message;
+    });
+  } on ApiException catch (exception) {
+    if (!mounted) return;
+
+    setState(() {
+      _errorMessage =
+          FailureMessages.of(exception, context.l10n);
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      _errorMessage = e.toString();
+    });
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -251,10 +313,11 @@ class _LoginScreenState extends State<LoginScreen> {
         const SizedBox(height: AppSpacing.lg),
         OrDivider(label: l10n.orLabel),
         const SizedBox(height: AppSpacing.xxl),
-        GoogleButton(
-          label: l10n.continueWithGoogle,
-          onPressed: _handleGoogleLogin,
-        ),
+      GoogleButton(
+     label: l10n.continueWithGoogle,
+  isLoading: _isSubmitting,
+  onPressed: _handleGoogleLogin,
+),
         const SizedBox(height: AppSpacing.xl),
         AuthFooterLink(
           leadingText: l10n.noAccount,

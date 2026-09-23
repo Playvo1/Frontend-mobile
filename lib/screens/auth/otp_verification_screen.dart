@@ -14,18 +14,9 @@ import '../../widgets/otp_box_input.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/resend_countdown.dart';
 
-/// What this verification code is for. It decides which endpoint the code
-/// is checked against and where the flow continues, so the one screen in
-/// the design serves both flows.
-enum OtpPurpose { signupVerification, passwordReset }
+ enum OtpPurpose { signupVerification, passwordReset }
 
-/// Six-digit code entry for email verification and for password reset.
-///
-/// For a password reset the code is NOT verified here: the backend checks
-/// email + code + new password together in a single
-/// `POST /auth/reset-password` call (Guidelines 7.2), so this screen carries
-/// the code forward to the reset screen instead of spending it early.
-class OtpVerificationScreen extends StatefulWidget {
+ class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({
     super.key,
     required this.purpose,
@@ -38,17 +29,21 @@ class OtpVerificationScreen extends StatefulWidget {
   final AuthService? authService;
 
   @override
-  State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  State<OtpVerificationScreen> createState() =>
+      _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
-  late final AuthService _authService = widget.authService ?? AuthService();
+class _OtpVerificationScreenState
+    extends State<OtpVerificationScreen> {
+  late final AuthService _authService =
+      widget.authService ?? AuthService();
 
   String _code = '';
   bool _isSubmitting = false;
   String? _errorMessage;
 
-  bool get _isSignup => widget.purpose == OtpPurpose.signupVerification;
+  bool get _isSignup =>
+      widget.purpose == OtpPurpose.signupVerification;
 
   Future<void> _handleSubmit() async {
     final AppLocalizations l10n = context.l10n;
@@ -59,11 +54,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     }
 
     if (!_isSignup) {
-      await AppRouter.toResetPassword(
-        context,
-        email: widget.email,
-        code: _code,
-      );
+      await _verifyResetOtp(l10n);
       return;
     }
 
@@ -77,7 +68,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     });
 
     try {
-      final ApiResponse<void> response = await _authService.verifyEmail(
+      final ApiResponse<void> response =
+          await _authService.verifyEmail(
         email: widget.email,
         code: _code,
       );
@@ -85,18 +77,70 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       if (!mounted) {
         return;
       }
+
       if (response.success) {
         await AppRouter.toLoginAndClearStack(context);
         return;
       }
+
       setState(
-        () => _errorMessage = response.errorFor('code') ?? response.message,
+        () => _errorMessage =
+            response.errorFor('code') ?? response.message,
       );
     } on ApiException catch (exception) {
       if (!mounted) {
         return;
       }
-      setState(() => _errorMessage = FailureMessages.of(exception, l10n));
+
+      setState(
+        () => _errorMessage =
+            FailureMessages.of(exception, l10n),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _verifyResetOtp(AppLocalizations l10n) async {
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final ApiResponse<void> response =
+          await _authService.verifyResetOtp(
+        email: widget.email,
+        code: _code,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (response.success) {
+        await AppRouter.toResetPassword(
+          context,
+          email: widget.email,
+        );
+        return;
+      }
+
+      setState(
+        () => _errorMessage =
+            response.errorFor('otp_code') ?? response.message,
+      );
+    } on ApiException catch (exception) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(
+        () => _errorMessage =
+            FailureMessages.of(exception, l10n),
+      );
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -105,21 +149,29 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   Future<void> _handleResend() async {
-    final AppLocalizations l10n = context.l10n;
-    try {
-      // Both flows re-issue a code through the same public endpoint.
+  final AppLocalizations l10n = context.l10n;
+
+  try {
+    if (_isSignup) {
+      await _authService.sendOtp(widget.email);
+    } else {
       await _authService.forgotPassword(widget.email);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.codeResent)),
-        );
-      }
-    } on ApiException catch (exception) {
-      if (mounted) {
-        setState(() => _errorMessage = FailureMessages.of(exception, l10n));
-      }
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.codeResent)),
+      );
+    }
+  } on ApiException catch (exception) {
+    if (mounted) {
+      setState(
+        () => _errorMessage =
+            FailureMessages.of(exception, l10n),
+      );
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -129,19 +181,28 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       title: l10n.otpTitle,
       subtitle: l10n.otpSubtitle(widget.email),
       children: <Widget>[
-        OtpBoxInput(
-          onChanged: (String code) => _code = code,
-        ),
+       OtpBoxInput(
+     onChanged: (String code) {
+    _code = code.trim();
+      print('OTP LENGTH: ${_code.length}');
+    },
+),
         ErrorBanner(message: _errorMessage),
         const SizedBox(height: AppSpacing.md),
-        Center(child: ResendCountdown(onResend: _handleResend)),
+        Center(
+          child: ResendCountdown(
+            onResend: _handleResend,
+          ),
+        ),
         const SizedBox(height: AppSpacing.xl),
         PrimaryButton(
-          label: _isSignup ? l10n.verifyButton : l10n.continueButton,
+          label: _isSignup
+              ? l10n.verifyButton
+              : l10n.continueButton,
           isLoading: _isSubmitting,
           onPressed: _handleSubmit,
         ),
       ],
     );
   }
-}
+} 

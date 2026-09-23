@@ -10,7 +10,7 @@ class AppConfig {
   /// Always includes the `/api/v1` version prefix (Guidelines 2.2).
   static const String apiBaseUrl = String.fromEnvironment(
     'PLAYVO_API_BASE_URL',
-    defaultValue: 'https://api.playvo.app/api/v1',
+  defaultValue: 'http://10.166.0.178:8000/api/v1',
   );
 
   static const Duration requestTimeout = Duration(seconds: 20);
@@ -21,4 +21,16 @@ class AppConfig {
 
   /// Length of the verification code sent by the backend.
   static const int verificationCodeLength = 6;
+
+  /// Serves the home screen from [MockVenueService] instead of the API.
+  /// On by default because `GET /venues` does not exist yet; build with
+  /// `--dart-define=PLAYVO_MOCK_VENUES=false` to hit the real endpoint, and
+  /// flip the default once the backend ships it.
+  static const bool useMockVenues =
+      bool.fromEnvironment('PLAYVO_MOCK_VENUES', defaultValue: true);
+
+  /// Opens the dev screen gallery instead of the splash screen. Off unless
+  /// the build passes `--dart-define=PLAYVO_GALLERY=true`, so it can never
+  /// reach a release build.
+  static const bool showScreenGallery = bool.fromEnvironment('PLAYVO_GALLERY');
 }
