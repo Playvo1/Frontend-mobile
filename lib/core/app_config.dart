@@ -15,6 +15,16 @@ class AppConfig {
 
   static const Duration requestTimeout = Duration(seconds: 20);
 
+  /// Uploading a receipt photo over a weak connection needs longer than a
+  /// JSON call.
+  static const Duration uploadTimeout = Duration(seconds: 60);
+
+  /// The Postman collection registers a player with a local number
+  /// ("05971003855"), so the app sends what was typed. Flip this once the
+  /// backend accepts E.164 and the dialling code will be prefixed instead.
+  /// TODO(api): confirm which format the backend validates.
+  static const bool sendInternationalPhone = false;
+
   /// How long the user waits before "resend code" becomes tappable. The
   /// code itself expires after 10 minutes server-side (Guidelines 2.4).
   static const Duration resendCooldown = Duration(seconds: 60);

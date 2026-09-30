@@ -6,7 +6,27 @@ import '../screens/auth/otp_verification_screen.dart';
 import '../screens/auth/reset_password_screen.dart';
 import '../screens/auth/reset_success_screen.dart';
 import '../screens/auth/signup_screen.dart';
+import '../models/booking.dart';
+import '../models/time_slot.dart';
+import '../models/venue.dart';
+import '../models/venue_filters.dart';
+import '../screens/booking/booking_details_screen.dart';
+import '../screens/booking/payment_proof_screen.dart';
 import '../screens/home_screen.dart';
+import '../widgets/app_bottom_nav.dart';
+import '../l10n/l10n.dart';
+import '../models/user.dart';
+import '../screens/account/account_screen.dart';
+import '../screens/account/edit_profile_screen.dart';
+import '../screens/assistant/assistant_screen.dart';
+import '../screens/booking/booking_confirmation_screen.dart';
+import '../screens/offline_screen.dart';
+import '../screens/rating/rating_screen.dart';
+import '../screens/bookings/my_bookings_screen.dart';
+import '../screens/favorites/favorites_screen.dart';
+import '../screens/venues/venue_details_screen.dart';
+import '../screens/venues/venue_map_screen.dart';
+import '../screens/venues/venue_search_screen.dart';
 
 /// Every navigation in the app goes through one of these methods.
 ///
@@ -80,6 +100,152 @@ class AppRouter {
     return Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const ResetSuccessScreen()),
       (Route<dynamic> route) => false,
+    );
+  }
+
+  static Future<void> toVenueSearch(
+    BuildContext context, {
+    required VenueFilters filters,
+  }) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => VenueSearchScreen(initialFilters: filters),
+      ),
+    );
+  }
+
+  static Future<void> toVenueDetails(BuildContext context, int venueId) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => VenueDetailsScreen(venueId: venueId),
+      ),
+    );
+  }
+
+  /// Step 1 of the booking. The slot travels as an object rather than an
+  /// id, because both booking screens display its time and price.
+  static Future<void> toBookingDetails(
+    BuildContext context, {
+    required Venue venue,
+    required TimeSlot slot,
+    required DateTime date,
+  }) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            BookingDetailsScreen(venue: venue, slot: slot, date: date),
+      ),
+    );
+  }
+
+  /// Step 2. Uses pushReplacement so Back cannot resubmit step 1 and
+  /// create a second booking for the same slot.
+  static Future<void> toPaymentProof(
+    BuildContext context, {
+    required Booking booking,
+    required Venue venue,
+    required TimeSlot slot,
+    required DateTime date,
+  }) {
+    return Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => PaymentProofScreen(
+          booking: booking,
+          venue: venue,
+          slot: slot,
+          date: date,
+        ),
+      ),
+    );
+  }
+
+  static Future<void> toVenueMap(
+    BuildContext context, {
+    required VenueFilters filters,
+  }) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => VenueMapScreen(filters: filters),
+      ),
+    );
+  }
+
+  /// Step 3. Replaces step 2 so Back cannot re-upload the receipt.
+  static Future<void> toBookingConfirmation(
+    BuildContext context, {
+    required Booking booking,
+    required Venue venue,
+    required TimeSlot slot,
+    required DateTime date,
+  }) {
+    return Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => BookingConfirmationScreen(
+          booking: booking,
+          venue: venue,
+          slot: slot,
+          date: date,
+        ),
+      ),
+    );
+  }
+
+  /// Moves between the four tabs of the bottom bar. Each tab becomes the
+  /// root of the stack, so switching tabs never stacks screens forever.
+  static Future<void> switchTab(BuildContext context, AppTab tab) {
+    switch (tab) {
+      case AppTab.home:
+        return toHomeAndClearStack(context);
+      case AppTab.bookings:
+        return _replaceRoot(context, const MyBookingsScreen());
+      case AppTab.favorites:
+        return _replaceRoot(context, const FavoritesScreen());
+      case AppTab.account:
+        return _replaceRoot(context, const AccountScreen());
+    }
+  }
+
+  static Future<void> _replaceRoot(BuildContext context, Widget screen) {
+    return Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute<void>(builder: (_) => screen),
+      (Route<dynamic> route) => false,
+    );
+  }
+
+  static Future<void> toEditProfile(BuildContext context, User? user) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => EditProfileScreen(user: user)),
+    );
+  }
+
+  static Future<void> toAssistant(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const AssistantScreen()),
+    );
+  }
+
+  static Future<void> toRating(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const RatingScreen()),
+    );
+  }
+
+  /// Opens the offline explainer. [onRetry] runs after it closes, so the
+  /// screen that opened it refetches rather than staying stale.
+  static Future<void> toOfflineScreen(
+    BuildContext context, {
+    required Future<void> Function() onRetry,
+  }) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext screenContext) => OfflineScreen(
+          onContinueOffline: () => Navigator.of(screenContext).pop(),
+          onRetry: () {
+            Navigator.of(screenContext).pop();
+            onRetry();
+          },
+        ),
+      ),
     );
   }
 }

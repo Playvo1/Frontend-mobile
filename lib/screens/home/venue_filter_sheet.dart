@@ -193,8 +193,19 @@ class _VenueFilterSheetState extends State<VenueFilterSheet> {
             ),
 
             const SizedBox(height: AppSpacing.xl),
+            // Apply first, so it lands on the right where the design has it.
             Row(
               children: <Widget>[
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(_draft),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    child: Text(l10n.filterApply),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () =>
@@ -205,16 +216,6 @@ class _VenueFilterSheetState extends State<VenueFilterSheet> {
                       minimumSize: const Size.fromHeight(48),
                     ),
                     child: Text(l10n.filterReset),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(_draft),
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                    child: Text(l10n.filterApply),
                   ),
                 ),
               ],
@@ -393,10 +394,22 @@ class _PriceRange extends StatelessWidget {
       children: <Widget>[
         SizedBox(
           width: 116,
-          child: Text(
-            label,
-            maxLines: 2,
-            style: textTheme.labelMedium,
+          child: Row(
+            children: <Widget>[
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  style: textTheme.labelMedium,
+                ),
+              ),
+              const SizedBox(width: 5),
+              const Icon(
+                Icons.sell_outlined,
+                size: 16,
+                color: AppColors.navy500,
+              ),
+            ],
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
@@ -465,13 +478,13 @@ class _RatingChips extends StatelessWidget {
           width: 116,
           child: Row(
             children: <Widget>[
+              Text(label, style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(width: 6),
               const Icon(
                 Icons.star_border_rounded,
                 size: 18,
                 color: AppColors.navy500,
               ),
-              const SizedBox(width: 6),
-              Text(label, style: Theme.of(context).textTheme.labelMedium),
             ],
           ),
         ),

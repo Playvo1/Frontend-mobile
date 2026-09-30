@@ -1,3 +1,5 @@
+import 'amenity.dart';
+
 /// A bookable sports facility, as shown on the home and search screens
 /// (SRS FR-05: address, photos, rating, hourly price).
 ///
@@ -17,6 +19,9 @@ class Venue {
     this.photos = const <String>[],
     this.isAvailableNow = false,
     this.isFavorite = false,
+    this.cityId,
+    this.sportId,
+    this.amenities = const <Amenity>[],
   });
 
   final int id;
@@ -46,8 +51,16 @@ class Venue {
   /// lookup; the server remains the source of truth.
   final bool isFavorite;
 
-  /// "المينا، غزة" — the one-line address shown under the name.
-  String get shortAddress => '$area، $city';
+  /// The ids the venue endpoint filters by (`city_id`, `sport_id`).
+  final int? cityId;
+  final int? sportId;
+
+  /// Shown as the small icon row on the search result card. The list
+  /// endpoint sends only the first few; the venue page has them all.
+  final List<Amenity> amenities;
+
+  /// "غزة - الرمال" — the one-line address shown under the name.
+  String get shortAddress => '$city - $area';
 
   String? get coverPhoto => photos.isEmpty ? null : photos.first;
 
@@ -64,15 +77,39 @@ class Venue {
       photos: photos,
       isAvailableNow: isAvailableNow,
       isFavorite: isFavorite ?? this.isFavorite,
+      cityId: cityId,
+      sportId: sportId,
+      amenities: amenities,
     );
   }
+
+  /// The shape [Venue.fromJson] reads back, used by the offline cache.
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'id': id,
+        'name': name,
+        'city': city,
+        'area': area,
+        'sport_type': sportType,
+        'rating': rating,
+        'review_count': reviewCount,
+        'min_hourly_price': hourlyPrice,
+        'photos': photos,
+        'is_available_now': isAvailableNow,
+        'is_favorite': isFavorite,
+        'city_id': cityId,
+        'sport_id': sportId,
+        'amenities': amenities.map((Amenity a) => a.toJson()).toList(),
+      };
 
   factory Venue.fromJson(Map<String, dynamic> json) {
     return Venue(
       id: json['id'] as int,
       name: json['name'] as String? ?? '',
-      city: json['city'] as String? ?? '',
-      area: json['area'] as String? ?? '',
+      // The API may send the city either as a plain string or as a nested
+      // object; both shapes are accepted so a change on the other side
+      // cannot blank out every card.
+      city: _nameOf(json['city']),
+      area: json['area'] as String? ?? _nameOf(json['district']),
       sportType: json['sport_type'] as String? ?? SportType.football,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
       reviewCount: json['review_count'] as int? ?? 0,
@@ -82,8 +119,23 @@ class Venue {
           .toList(),
       isAvailableNow: json['is_available_now'] as bool? ?? false,
       isFavorite: json['is_favorite'] as bool? ?? false,
+      cityId: json['city_id'] as int?,
+      sportId: json['sport_id'] as int?,
+      amenities: (json['amenities'] as List<dynamic>? ?? <dynamic>[])
+          .map((dynamic a) => Amenity.fromJson(a as Map<String, dynamic>))
+          .toList(),
     );
   }
+}
+
+String _nameOf(dynamic value) {
+  if (value is String) {
+    return value;
+  }
+  if (value is Map<String, dynamic>) {
+    return value['name'] as String? ?? '';
+  }
+  return '';
 }
 
 /// The sport values agreed with the backend. Football is the only one in

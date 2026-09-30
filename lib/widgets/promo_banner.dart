@@ -42,7 +42,7 @@ class PromoBanner extends StatelessWidget {
                   // gone by the time it reaches the photo.
                   begin: AlignmentDirectional.centerStart,
                   end: AlignmentDirectional.centerEnd,
-                  stops: <double>[0, 0.52, 0.70],
+                  stops: <double>[0, 0.40, 0.86],
                   colors: <Color>[
                     AppColors.navy900,
                     AppColors.navy900,
@@ -59,16 +59,16 @@ class PromoBanner extends StatelessWidget {
                 // Keeps the wrapped subtitle inside the navy area instead of
                 // running across the photo.
                 Expanded(
-                  flex: 55,
+                  flex: 58,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
                       Text(
                         l10n.promoTitle,
-                        style: textTheme.labelLarge?.copyWith(
+                        style: textTheme.headlineSmall?.copyWith(
                           color: AppColors.white,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 20,
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
@@ -87,7 +87,7 @@ class PromoBanner extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Expanded(flex: 45, child: SizedBox.shrink()),
+                const Expanded(flex: 42, child: SizedBox.shrink()),
               ],
             ),
           ),
@@ -111,10 +111,10 @@ class _StartBookingButton extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: AppColors.orange500,
         foregroundColor: AppColors.white,
-        minimumSize: const Size(0, 38),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        minimumSize: const Size(0, 42),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSpacing.sm),
+          borderRadius: BorderRadius.circular(AppSpacing.xl),
         ),
         textStyle: Theme.of(context)
             .textTheme

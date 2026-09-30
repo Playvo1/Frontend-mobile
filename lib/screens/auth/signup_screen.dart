@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api_exception.dart';
+import '../../core/app_config.dart';
 import '../../core/country_codes.dart';
 import '../../core/api_response.dart';
 import '../../core/app_router.dart';
@@ -59,13 +60,16 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  /// The phone number in international form, e.g. `+970599123456`.
-  /// A local leading zero is dropped, because it is not used once the
-  /// country code is in front.
-  String get _internationalPhone {
-    final String local =
-        _phoneController.text.trim().replaceFirst(RegExp(r'^0+'), '');
-    return local.isEmpty ? '' : '${_country.dialCode}$local';
+  /// The number as the backend wants it. By default that is exactly what
+  /// the player typed, matching the API's own example; with
+  /// [AppConfig.sendInternationalPhone] the dialling code is prefixed and
+  /// the local leading zero dropped.
+  String get _phoneForApi {
+    final String typed = _phoneController.text.trim();
+    if (typed.isEmpty || !AppConfig.sendInternationalPhone) {
+      return typed;
+    }
+    return '${_country.dialCode}${typed.replaceFirst(RegExp(r'^0+'), '')}';
   }
 
   Future<void> _handleSignup() async {
@@ -86,7 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
         name: _nameController.text.trim(),
         email: email,
         password: _passwordController.text,
-        phone: _internationalPhone,
+        phone: _phoneForApi,
       );
 
       if (!mounted) {

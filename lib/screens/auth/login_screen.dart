@@ -296,8 +296,10 @@ Future<void> _handleGoogleLogin() async {
               Validators.requiredPassword(value, l10n),
         ),
         const SizedBox(height: AppSpacing.sm),
+        // The design puts this link on the left, which in Arabic is the
+        // END of the line, not the start.
         Align(
-          alignment: AlignmentDirectional.centerStart,
+          alignment: AlignmentDirectional.centerEnd,
           child: TextButton(
             onPressed: () => AppRouter.toForgotPassword(context),
             child: Text(l10n.forgotPassword),

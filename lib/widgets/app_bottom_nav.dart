@@ -6,7 +6,9 @@ import '../theme/app_colors.dart';
 /// The five player tabs from the design. Only [AppTab.home] is built so
 /// far; the screen decides what to do with the rest, so this widget stays a
 /// dumb bar.
-enum AppTab { account, favorites, bookings, explore, home }
+/// Four tabs, as the design draws the bar. There is no Explore tab: the
+/// results and map screens are reached from Home.
+enum AppTab { account, favorites, bookings, home }
 
 /// The bottom navigation bar shared by every player screen.
 class AppBottomNav extends StatelessWidget {
@@ -38,13 +40,6 @@ class AppBottomNav extends StatelessWidget {
               tab: AppTab.home,
               icon: Icons.home_filled,
               label: l10n.navHome,
-              current: current,
-              onSelected: onSelected,
-            ),
-            _NavItem(
-              tab: AppTab.explore,
-              icon: Icons.search,
-              label: l10n.navExplore,
               current: current,
               onSelected: onSelected,
             ),

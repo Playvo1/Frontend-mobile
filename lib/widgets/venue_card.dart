@@ -88,9 +88,11 @@ class _Thumbnail extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppSpacing.sm + 2),
             ),
           ),
+          // start, not end: in Arabic the start side is the right, which is
+          // where the design puts the heart.
           PositionedDirectional(
             top: 6,
-            end: 6,
+            start: 6,
             child: InkWell(
               onTap: onToggleFavorite,
               customBorder: const CircleBorder(),

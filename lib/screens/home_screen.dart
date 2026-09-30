@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/api_exception.dart';
 import '../core/api_response.dart';
+import '../core/app_router.dart';
 import '../core/failure_messages.dart';
 import '../core/reference_data.dart';
 import '../l10n/l10n.dart';
@@ -11,8 +12,10 @@ import '../services/venue_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../widgets/city_picker_sheet.dart';
 import '../widgets/error_banner.dart';
 import '../widgets/home_search_field.dart';
+import '../widgets/offline_banner.dart';
 import '../widgets/playvo_logo.dart';
 import '../widgets/promo_banner.dart';
 import '../widgets/venue_card.dart';
@@ -89,6 +92,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// The header's location opens the city list; the rest of the filters
+  /// stay in the filter sheet.
+  Future<void> _pickCity() async {
+    final String? city = await CityPickerSheet.show(context, _selectedCity);
+    if (city == null) {
+      return;
+    }
+    setState(() {
+      _selectedCity = city;
+      _filters = _filters.copyWith(city: city);
+    });
+    await _loadVenues();
+  }
+
   Future<void> _openFilters() async {
     final VenueFilters? applied =
         await VenueFilterSheet.show(context, _filters);
@@ -105,7 +122,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _search(String query) async {
     setState(() => _filters = _filters.copyWith(query: query.trim()));
-    await _loadVenues();
+    await _openAllVenues();
+  }
+
+  /// The results screen shows the active filters as chips, so it is opened
+  /// with the city, sport and day already set rather than empty.
+  Future<void> _openAllVenues() {
+    final DateTime now = DateTime.now();
+    return AppRouter.toVenueSearch(
+      context,
+      filters: _filters.copyWith(
+        city: _filters.city ?? _selectedCity,
+        sportType: _filters.sportType ?? SportType.football,
+        date: _filters.date ?? DateTime(now.year, now.month, now.day),
+      ),
+    );
   }
 
   Future<void> _toggleFavorite(Venue venue) async {
@@ -158,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Only the home tab is built so far.
         onSelected: (AppTab tab) {
           if (tab != AppTab.home) {
-            _showComingSoon();
+            AppRouter.switchTab(context, tab);
           }
         },
       ),
@@ -175,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: <Widget>[
               _Header(
                 city: _selectedCity,
-                onCityPressed: _openFilters,
+                onCityPressed: _pickCity,
                 onNotificationsPressed: _showComingSoon,
                 onProfilePressed: _showComingSoon,
               ),
@@ -191,14 +222,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 hasActiveFilters: _filters.isActive,
               ),
               const SizedBox(height: AppSpacing.md),
-              PromoBanner(onPressed: _showComingSoon),
+              PromoBanner(onPressed: _openAllVenues),
               const SizedBox(height: AppSpacing.xl),
               _SectionHeader(
                 title: l10n.nearbyVenues,
                 actionLabel: l10n.viewAll,
-                onAction: _showComingSoon,
+                onAction: _openAllVenues,
               ),
               const SizedBox(height: AppSpacing.md),
+              OfflineBanner(
+                onTap: () => AppRouter.toOfflineScreen(context, onRetry: _loadVenues),
+              ),
               ErrorBanner(message: _errorMessage),
               ..._buildVenueList(l10n),
             ],
@@ -237,8 +271,8 @@ class _HomeScreenState extends State<HomeScreen> {
         .map(
           (Venue venue) => VenueCard(
             venue: venue,
-            onTap: _showComingSoon,
-            onBook: _showComingSoon,
+            onTap: () => AppRouter.toVenueDetails(context, venue.id),
+            onBook: () => AppRouter.toVenueDetails(context, venue.id),
             onToggleFavorite: () => _toggleFavorite(venue),
           ),
         )

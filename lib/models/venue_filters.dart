@@ -12,6 +12,8 @@ import 'venue.dart';
 class VenueFilters {
   const VenueFilters({
     this.city,
+    this.cityId,
+    this.sportId,
     this.sportType,
     this.date,
     this.time,
@@ -25,7 +27,13 @@ class VenueFilters {
   static const double priceFloor = 50;
   static const double priceCeiling = 200;
 
+  /// Display name of the city, for the chips and the header.
   final String? city;
+
+  /// What `GET /venues` filters by.
+  final int? cityId;
+  final int? sportId;
+
   final String? sportType;
   final DateTime? date;
   final TimeOfDay? time;
@@ -53,6 +61,8 @@ class VenueFilters {
 
   VenueFilters copyWith({
     Object? city = _unset,
+    Object? cityId = _unset,
+    Object? sportId = _unset,
     Object? sportType = _unset,
     Object? date = _unset,
     Object? time = _unset,
@@ -63,6 +73,8 @@ class VenueFilters {
   }) {
     return VenueFilters(
       city: city == _unset ? this.city : city as String?,
+      cityId: cityId == _unset ? this.cityId : cityId as int?,
+      sportId: sportId == _unset ? this.sportId : sportId as int?,
       sportType: sportType == _unset ? this.sportType : sportType as String?,
       date: date == _unset ? this.date : date as DateTime?,
       time: time == _unset ? this.time : time as TimeOfDay?,
@@ -79,11 +91,13 @@ class VenueFilters {
   /// Query parameters for the venue endpoint. Only what is actually set is
   /// sent, to keep requests light on weak networks (SRS NFR-01e).
   Map<String, String> toQueryParameters() {
+    // Names taken from the Postman collection:
+    // GET /venues?city_id=&sport_id=&date=&hour=&page=
     return <String, String>{
       if (query.isNotEmpty) 'q': query,
-      if (city != null) 'city': city!,
-      if (sportType != null) 'sport_type': sportType!,
-      if (date != null) 'date': _formatDate(date!),
+      if (cityId != null) 'city_id': cityId!.toString(),
+      if (sportId != null) 'sport_id': sportId!.toString(),
+      if (date != null) 'date': formatDate(date!),
       if (time != null) 'hour': _formatTime(time!),
       if (!isPriceRangeDefault) ...<String, String>{
         'min_price': minPrice.round().toString(),
@@ -93,7 +107,8 @@ class VenueFilters {
     };
   }
 
-  static String _formatDate(DateTime date) {
+  /// `YYYY-MM-DD`, the format the API's `date` parameter takes.
+  static String formatDate(DateTime date) {
     final String month = date.month.toString().padLeft(2, '0');
     final String day = date.day.toString().padLeft(2, '0');
     return '${date.year}-$month-$day';
