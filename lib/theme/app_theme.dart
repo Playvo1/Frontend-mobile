@@ -63,9 +63,13 @@ class AppTheme {
         fontWeight: FontWeight.w500,
         color: AppColors.navy500,
       ),
+      // The colour is explicit: labelLarge is Material's default button
+      // text style, so without one it inherits white and disappears on a
+      // white card.
       labelLarge: GoogleFonts.cairo(
         fontSize: 16,
         fontWeight: FontWeight.w600,
+        color: AppColors.navy900,
       ),
       // Inline links and footer links, e.g. "نسيت كلمة المرور؟".
       labelMedium: GoogleFonts.cairo(

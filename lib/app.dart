@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'core/app_config.dart';
 import 'core/locale_controller.dart';
+import 'dev/screen_gallery.dart';
 import 'l10n/l10n.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
@@ -32,7 +34,9 @@ class PlayvoApp extends StatelessWidget {
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
           ],
-          home: const SplashScreen(),
+          home: AppConfig.showScreenGallery
+              ? const ScreenGallery()
+              : const SplashScreen(),
         );
       },
     );

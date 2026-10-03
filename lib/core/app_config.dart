@@ -15,10 +15,32 @@ class AppConfig {
 
   static const Duration requestTimeout = Duration(seconds: 20);
 
+  /// Uploading a receipt photo over a weak connection needs longer than a
+  /// JSON call.
+  static const Duration uploadTimeout = Duration(seconds: 60);
+
+  /// The Postman collection registers a player with a local number
+  /// ("05971003855"), so the app sends what was typed. Flip this once the
+  /// backend accepts E.164 and the dialling code will be prefixed instead.
+  /// TODO(api): confirm which format the backend validates.
+  static const bool sendInternationalPhone = false;
+
   /// How long the user waits before "resend code" becomes tappable. The
   /// code itself expires after 10 minutes server-side (Guidelines 2.4).
   static const Duration resendCooldown = Duration(seconds: 60);
 
   /// Length of the verification code sent by the backend.
   static const int verificationCodeLength = 6;
+
+  /// Serves the home screen from [MockVenueService] instead of the API.
+  /// On by default because `GET /venues` does not exist yet; build with
+  /// `--dart-define=PLAYVO_MOCK_VENUES=false` to hit the real endpoint, and
+  /// flip the default once the backend ships it.
+  static const bool useMockVenues =
+      bool.fromEnvironment('PLAYVO_MOCK_VENUES', defaultValue: true);
+
+  /// Opens the dev screen gallery instead of the splash screen. Off unless
+  /// the build passes `--dart-define=PLAYVO_GALLERY=true`, so it can never
+  /// reach a release build.
+  static const bool showScreenGallery = bool.fromEnvironment('PLAYVO_GALLERY');
 }

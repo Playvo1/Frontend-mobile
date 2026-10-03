@@ -55,4 +55,20 @@ class AppColors {
   static const Color warning = Color(0xFFB77400);
   static const Color success = Color(0xFF1B7F4B);
   static const Color successBackground = Color(0xFFE8F5EE);
+
+  // The confirmation mark on the "password updated" screen.
+  // TODO(design): confirm against the Figma Source of Truth.
+  static const Color successAccent = Color(0xFF2E7DF6);
+
+  /// The filled heart on the favourites screen, measured from the design.
+  static const Color favoriteRed = Color(0xFFEF4444);
+
+  /// Booking status colours, also measured from the design.
+  static const Color statusUpcoming = orange500;
+  static const Color statusUpcomingBackground = orange50;
+  static const Color statusCompleted = Color(0xFF059669);
+  static const Color statusCompletedBackground = Color(0xFFE8F5EE);
+  static const Color statusCancelled = Color(0xFFEF4444);
+  static const Color statusCancelledBackground = Color(0xFFFDECEC);
+  static const Color successAccentHalo = Color(0xFFD9E7FD);
 }

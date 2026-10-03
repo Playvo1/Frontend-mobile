@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api_exception.dart';
+import '../../core/app_config.dart';
+import '../../core/country_codes.dart';
 import '../../core/api_response.dart';
 import '../../core/app_router.dart';
 import '../../core/failure_messages.dart';
@@ -8,11 +10,11 @@ import '../../core/validators.dart';
 import '../../l10n/l10n.dart';
 import '../../models/registration_result.dart';
 import '../../services/auth_service.dart';
-import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_text_field.dart';
 import '../../widgets/auth_footer_link.dart';
 import '../../widgets/auth_screen_scaffold.dart';
+import '../../widgets/country_code_field.dart';
 import '../../widgets/error_banner.dart';
 import '../../widgets/google_button.dart';
 import '../../widgets/or_divider.dart';
@@ -41,6 +43,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   late final AuthService _authService = widget.authService ?? AuthService();
 
+  CountryCode _country = CountryCodes.defaultCountry;
+
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isSubmitting = false;
@@ -54,6 +58,18 @@ class _SignupScreenState extends State<SignupScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  /// The number as the backend wants it. By default that is exactly what
+  /// the player typed, matching the API's own example; with
+  /// [AppConfig.sendInternationalPhone] the dialling code is prefixed and
+  /// the local leading zero dropped.
+  String get _phoneForApi {
+    final String typed = _phoneController.text.trim();
+    if (typed.isEmpty || !AppConfig.sendInternationalPhone) {
+      return typed;
+    }
+    return '${_country.dialCode}${typed.replaceFirst(RegExp(r'^0+'), '')}';
   }
 
   Future<void> _handleSignup() async {
@@ -74,7 +90,7 @@ class _SignupScreenState extends State<SignupScreen> {
         name: _nameController.text.trim(),
         email: email,
         password: _passwordController.text,
-        phone: _phoneController.text.trim(),
+        phone: _phoneForApi,
       );
 
       if (!mounted) {
@@ -147,14 +163,12 @@ class _SignupScreenState extends State<SignupScreen> {
           autofillHints: const <String>[AutofillHints.telephoneNumber],
           leadingIcon: Icons.call_outlined,
           validator: (String? value) => Validators.optionalPhone(value, l10n),
-          // A static prefix, not a picker: Playvo launches in Palestine only,
-          // so a country dropdown would be unused UI (YAGNI).
-          suffix: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-            child: Text(
-              '+970',
-              style: TextStyle(color: AppColors.navy500, fontSize: 13),
-            ),
+          // The dialling code is a real picker, not a label: a player may
+          // register with a number from any country.
+          suffix: CountryCodeField(
+            selected: _country,
+            onChanged: (CountryCode country) =>
+                setState(() => _country = country),
           ),
         ),
         const SizedBox(height: AppSpacing.md),

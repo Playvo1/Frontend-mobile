@@ -73,7 +73,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         return;
       }
       if (response.success) {
-        await AppRouter.toLoginAndClearStack(context);
+        await AppRouter.toResetSuccess(context);
         return;
       }
       // An expired or already-used code comes back on the `code` field.
