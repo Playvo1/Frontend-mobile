@@ -75,7 +75,10 @@ class AppRouter {
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => OtpVerificationScreen(purpose: purpose, email: email),
+        builder: (_) => OtpVerificationScreen(
+          purpose: purpose,
+          email: email,
+        ),
       ),
     );
   }
@@ -83,16 +86,16 @@ class AppRouter {
   /// The email and the verified code are carried in, because
   /// `POST /auth/reset-password` needs all three of email, code and the new
   /// password in one request (Guidelines 7.2).
- static Future<void> toResetPassword(
-  BuildContext context, {
-  required String email,
-}) {
-  return Navigator.of(context).pushReplacement(
-    MaterialPageRoute<void>(
-      builder: (_) => ResetPasswordScreen(email: email),
-    ),
-  );
-}
+  static Future<void> toResetPassword(
+    BuildContext context, {
+    required String email,
+  }) {
+    return Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => ResetPasswordScreen(email: email),
+      ),
+    );
+  }
 
   /// Shown once the password has actually been changed. The stack is
   /// cleared so Back cannot return into the spent reset flow.
@@ -132,8 +135,11 @@ class AppRouter {
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            BookingDetailsScreen(venue: venue, slot: slot, date: date),
+        builder: (_) => BookingDetailsScreen(
+          venue: venue,
+          slot: slot,
+          date: date,
+        ),
       ),
     );
   }
@@ -214,19 +220,25 @@ class AppRouter {
 
   static Future<void> toEditProfile(BuildContext context, User? user) {
     return Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => EditProfileScreen(user: user)),
+      MaterialPageRoute<void>(
+        builder: (_) => EditProfileScreen(user: user),
+      ),
     );
   }
 
   static Future<void> toAssistant(BuildContext context) {
     return Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const AssistantScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => const AssistantScreen(),
+      ),
     );
   }
 
   static Future<void> toRating(BuildContext context) {
     return Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const RatingScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => const RatingScreen(),
+      ),
     );
   }
 
