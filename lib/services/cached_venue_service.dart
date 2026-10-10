@@ -3,6 +3,7 @@ import '../core/api_response.dart';
 import '../core/database/sync_status_dao.dart';
 import '../core/database/venue_cache.dart';
 import '../core/offline_state.dart';
+import '../models/time_slot.dart';
 import '../models/venue.dart';
 import '../models/venue_details.dart';
 import '../models/venue_filters.dart';
@@ -81,6 +82,17 @@ class CachedVenueService implements VenueService {
         data: cached,
       );
     }
+  }
+
+  /// Availability is the one thing that must never be served stale: a slot
+  /// cached an hour ago may already be booked. So this call is not cached
+  /// and simply fails when there is no connection.
+  @override
+  Future<ApiResponse<List<TimeSlot>>> timeSlots(
+    int venueId, {
+    required DateTime date,
+  }) {
+    return _remote.timeSlots(venueId, date: date);
   }
 
   @override

@@ -4,6 +4,7 @@ import '../../l10n/l10n.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_back_button.dart';
+import '../../widgets/app_illustration.dart';
 
 /// One line of the conversation.
 class AssistantMessage {
@@ -32,6 +33,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   final List<AssistantMessage> _messages = <AssistantMessage>[];
 
+  /// Drawn as the three-dot bubble while a reply is on its way.
+  bool _isAssistantTyping = false;
+
   @override
   void dispose() {
     _inputController.dispose();
@@ -39,7 +43,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     super.dispose();
   }
 
-  void _send(String text) {
+  Future<void> _send(String text) async {
     final String trimmed = text.trim();
     if (trimmed.isEmpty) {
       return;
@@ -47,8 +51,21 @@ class _AssistantScreenState extends State<AssistantScreen> {
     setState(() {
       _messages.add(AssistantMessage(text: trimmed, isFromPlayer: true));
       _inputController.clear();
+      _isAssistantTyping = true;
     });
-    // Jump to the newest message after the frame that adds it.
+    _scrollToEnd();
+
+    // TODO(api): there is no assistant endpoint yet. The indicator shows
+    // that a reply is expected and then clears; replace this delay with
+    // the call once the backend adds one.
+    await Future<void>.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      setState(() => _isAssistantTyping = false);
+    }
+  }
+
+  /// Jumps to the newest message after the frame that adds it.
+  void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -83,7 +100,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
               child: AppScreenHeader(
                 title: l10n.assistantTitle,
                 subtitle: l10n.assistantSubtitle,
-                centerTitle: true,
               ),
             ),
             Expanded(
@@ -93,11 +109,18 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   horizontal: AppSpacing.screenHorizontal,
                 ),
                 children: <Widget>[
-                  const Center(child: _AssistantMascot()),
-                  const SizedBox(height: AppSpacing.md),
-                  _Bubble(
-                    text: l10n.assistantGreeting,
-                    isFromPlayer: false,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: <Widget>[
+                      const _AssistantMascot(),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _Bubble(
+                          text: l10n.assistantGreeting,
+                          isFromPlayer: false,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   Text(
@@ -108,10 +131,11 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
+                    // Three across, two rows — as the design lays them out.
+                    crossAxisCount: 3,
                     mainAxisSpacing: AppSpacing.sm,
                     crossAxisSpacing: AppSpacing.sm,
-                    childAspectRatio: 1.9,
+                    childAspectRatio: 1.05,
                     children: suggestions
                         .map(
                           (_Suggestion s) => _SuggestionCard(
@@ -120,6 +144,38 @@ class _AssistantScreenState extends State<AssistantScreen> {
                           ),
                         )
                         .toList(),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _Bubble(text: l10n.assistantSampleUser, isFromPlayer: true),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        '9:41',
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelSmall
+                            ?.copyWith(fontSize: 10),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.check,
+                        size: 13,
+                        color: AppColors.successAccent,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  _Bubble(text: l10n.assistantSampleReply, isFromPlayer: false),
+                  const SizedBox(height: AppSpacing.sm),
+                  _QuickReplies(
+                    labels: <String>[
+                      l10n.assistantOptionCurrent,
+                      l10n.assistantOptionArea,
+                      l10n.assistantOptionAll,
+                    ],
+                    onSelected: _send,
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   ..._messages.map(
@@ -131,6 +187,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
                       ),
                     ),
                   ),
+                  if (_isAssistantTyping) const _TypingBubble(),
                   const SizedBox(height: AppSpacing.lg),
                 ],
               ),
@@ -239,24 +296,15 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-/// The circular assistant mark above the greeting.
+/// The waving robot from the design.
 class _AssistantMascot extends StatelessWidget {
   const _AssistantMascot();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 104,
-      height: 104,
-      decoration: BoxDecoration(
-        color: AppColors.successAccent,
-        borderRadius: BorderRadius.circular(32),
-      ),
-      child: const Icon(
-        Icons.smart_toy_outlined,
-        size: 52,
-        color: AppColors.white,
-      ),
+    return const AppIllustration(
+      asset: AppIllustration.assistantRobot,
+      height: 130,
     );
   }
 }
@@ -313,6 +361,124 @@ class _InputBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The chips the assistant offers after a question, so the player can
+/// answer with a tap instead of typing.
+class _QuickReplies extends StatelessWidget {
+  const _QuickReplies({required this.labels, required this.onSelected});
+
+  final List<String> labels;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.sm,
+      runSpacing: AppSpacing.sm,
+      children: labels
+          .map(
+            (String label) => InkWell(
+              onTap: () => onSelected(label),
+              borderRadius: BorderRadius.circular(AppSpacing.sm),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(AppSpacing.sm),
+                  border: Border.all(color: AppColors.successAccent),
+                ),
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.navy900,
+                        fontSize: 12,
+                      ),
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+/// The three-dot bubble shown while the assistant is composing a reply.
+class _TypingBubble extends StatefulWidget {
+  const _TypingBubble();
+
+  @override
+  State<_TypingBubble> createState() => _TypingBubbleState();
+}
+
+class _TypingBubbleState extends State<_TypingBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: AlignmentDirectional.centerEnd,
+      // The dots carry no text, so the meaning is given to assistive
+      // technology explicitly.
+      child: Semantics(
+        label: context.l10n.assistantTyping,
+        child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.navy50,
+          borderRadius: BorderRadius.circular(AppSpacing.md),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (int i = 0; i < 3; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (BuildContext context, Widget? child) {
+                    // Each dot lags the one before it, so the row reads as
+                    // a wave rather than a blink.
+                    final double phase = (_controller.value - i * 0.2) % 1.0;
+                    final double lift = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+                    return Opacity(
+                      opacity: 0.35 + lift * 0.65,
+                      child: child,
+                    );
+                  },
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: AppColors.navy500,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        ),
       ),
     );
   }

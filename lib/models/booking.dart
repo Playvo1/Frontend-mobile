@@ -10,6 +10,9 @@ class Booking {
     this.slot,
     this.date,
     this.totalPrice,
+    this.score,
+    this.shareToken,
+    this.isRated = false,
   });
 
   final int id;
@@ -25,6 +28,51 @@ class Booking {
   final DateTime? date;
   final int? totalPrice;
 
+  /// "2 - 3" — the final score, when the owner recorded one.
+  final String? score;
+
+  /// Opaque token behind the public link (GET /bookings/share/{token}).
+  final String? shareToken;
+
+  /// True once the player has rated this booking, so the prompt is not
+  /// shown again.
+  final bool isRated;
+
+  /// Whether the slot's end time has passed. A booking is rateable only
+  /// after the game, per FR-13.
+  bool get hasFinished {
+    final DateTime? day = date;
+    final String? end = slot?.endTime;
+    if (day == null || end == null) {
+      return status == BookingStatus.completed;
+    }
+    final List<String> endParts = end.split(':');
+    final int endHour = int.tryParse(endParts.first) ?? 0;
+    final int endMinute =
+        endParts.length > 1 ? int.tryParse(endParts[1]) ?? 0 : 0;
+
+    // A slot like 22:00 - 01:00 ends on the NEXT day. Without this the end
+    // lands in the past the moment the booking is made, and the game counts
+    // as finished before it has started.
+    final int startHour =
+        int.tryParse((slot?.startTime ?? '').split(':').first) ?? 0;
+    final int dayOffset = endHour < startHour ? 1 : 0;
+
+    final DateTime endsAt = DateTime(
+      day.year,
+      day.month,
+      day.day + dayOffset,
+      endHour,
+      endMinute,
+    );
+    return DateTime.now().isAfter(endsAt);
+  }
+
+  /// The prompt is owed when the game is over, the booking was not
+  /// cancelled, and no rating has been sent yet.
+  bool get awaitsRating =>
+      hasFinished && status != BookingStatus.cancelled && !isRated;
+
   bool get awaitsPaymentProof => status == BookingStatus.pending;
 
   bool get isUpcoming => status == BookingStatus.pending ||
@@ -32,6 +80,22 @@ class Booking {
 
   /// "PV258731" — the reference shown to the player.
   String get reference => 'PV${id.toString().padLeft(6, '0')}';
+
+  /// Returns a copy with the given fields replaced. Used where a single
+  /// field changes locally, such as marking a booking rated.
+  Booking copyWith({String? status, bool? isRated}) {
+    return Booking(
+      id: id,
+      status: status ?? this.status,
+      venue: venue,
+      slot: slot,
+      date: date,
+      totalPrice: totalPrice,
+      score: score,
+      shareToken: shareToken,
+      isRated: isRated ?? this.isRated,
+    );
+  }
 
   factory Booking.fromJson(Map<String, dynamic> json) {
     final String? rawDate = json['date'] as String?;
@@ -47,6 +111,9 @@ class Booking {
       slot: slotJson == null ? null : TimeSlot.fromJson(slotJson),
       date: rawDate == null ? null : DateTime.tryParse(rawDate),
       totalPrice: (json['total_price'] as num?)?.round(),
+      score: json['score'] as String?,
+      shareToken: json['share_token'] as String?,
+      isRated: json['is_rated'] as bool? ?? false,
     );
   }
 }
@@ -63,9 +130,9 @@ class BookingStatus {
 
 /// What the captain is to the team, sent as `captain_role`.
 ///
-/// TODO(api): the Postman example sends the free string "Captain". Confirm
-/// whether the backend validates against a fixed list; if it does, these
-/// values must match it exactly.
+/// The backend accepts `captain_role` as free text (confirmed), so this
+/// list is a convenience for the picker rather than a contract: adding a
+/// role here needs no backend change.
 class CaptainRole {
   CaptainRole._();
 

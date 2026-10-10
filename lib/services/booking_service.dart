@@ -16,10 +16,23 @@ abstract class BookingService {
       AppConfig.useMockVenues ? MockBookingService() : ApiBookingService();
 
   /// `GET /bookings` — the player's own reservations, newest first.
-  Future<ApiResponse<List<Booking>>> myBookings();
+  ///
+  /// [sportType] narrows the list to one sport (SRS FR-14); null means all.
+  Future<ApiResponse<List<Booking>>> myBookings({
+    int page = 1,
+    String? sportType,
+  });
 
   /// Cancels a reservation and frees its slot.
   Future<ApiResponse<Booking>> cancel(int bookingId);
+
+  /// SRS FR-13. Sends the player's rating for a finished booking.
+  Future<ApiResponse<void>> rate({
+    required int bookingId,
+    required int stars,
+    required List<String> tags,
+    required String notes,
+  });
 
   Future<ApiResponse<Booking>> createBooking({
     required int timeSlotId,
@@ -43,10 +56,17 @@ class ApiBookingService implements BookingService {
   final ApiClient _client;
 
   @override
-  Future<ApiResponse<List<Booking>>> myBookings() {
+  Future<ApiResponse<List<Booking>>> myBookings({
+    int page = 1,
+    String? sportType,
+  }) {
     return _client.get<List<Booking>>(
       '/bookings',
       authenticated: true,
+      query: <String, String>{
+        'page': '$page',
+        if (sportType != null) 'sport_type': sportType,
+      },
       parseData: (dynamic data) {
         // Laravel returns either a bare array or a paginated envelope.
         final List<dynamic> items = data is Map<String, dynamic>
@@ -68,6 +88,28 @@ class ApiBookingService implements BookingService {
       authenticated: true,
       parseData: (dynamic data) =>
           Booking.fromJson(data as Map<String, dynamic>),
+    );
+  }
+
+  /// TODO(api): the body is a best guess — the endpoint is in the backend's
+  /// list but its contract has not been shared. Confirm the field names
+  /// (`stars`/`rating`, `tags`, `comment`/`notes`) before release; they are
+  /// all in this one method.
+  @override
+  Future<ApiResponse<void>> rate({
+    required int bookingId,
+    required int stars,
+    required List<String> tags,
+    required String notes,
+  }) {
+    return _client.post<void>(
+      '/bookings/$bookingId/rating',
+      authenticated: true,
+      body: <String, dynamic>{
+        'rating': stars,
+        'tags': tags,
+        if (notes.isNotEmpty) 'comment': notes,
+      },
     );
   }
 

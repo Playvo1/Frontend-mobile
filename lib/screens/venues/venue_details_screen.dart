@@ -10,6 +10,7 @@ import '../../models/time_slot.dart';
 import '../../models/venue_details.dart';
 import '../../services/venue_service.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/fixed_chevron.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/date_strip.dart';
@@ -81,6 +82,10 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
           // A slot id from the previous day means nothing on this one.
           _selectedSlotId = null;
         });
+        // The backend serves availability from its own endpoint, so the
+        // slots are refreshed separately. A failure there leaves whatever
+        // the venue response carried rather than emptying the grid.
+        await _loadSlots();
         return;
       }
       setState(() => _errorMessage = response.message);
@@ -95,6 +100,32 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  /// Reads the day's slots from `GET /venues/{id}/time-slots`.
+  Future<void> _loadSlots() async {
+    try {
+      final ApiResponse<List<TimeSlot>> response =
+          await _venueService.timeSlots(widget.venueId, date: _selectedDate);
+      final VenueDetails? current = _details;
+      if (!mounted || current == null || !response.success) {
+        return;
+      }
+      final List<TimeSlot> fetched = response.data ?? <TimeSlot>[];
+      // The venue response already carries `time_slots` for the requested
+      // date. If this endpoint answers with an empty list — it does not
+      // exist publicly on every deployment — keep what the venue sent
+      // rather than blanking a day that does have hours.
+      if (fetched.isEmpty && current.timeSlots.isNotEmpty) {
+        return;
+      }
+      setState(
+        () => _details = current.copyWith(timeSlots: fetched),
+      );
+    } on ApiException {
+      // Availability is a refinement here, not the screen's purpose; the
+      // venue is still worth showing without it.
     }
   }
 
@@ -294,7 +325,7 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
       firstDate: _today,
       lastDate: _today.add(const Duration(days: 90)),
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() => _stripStart = picked);
       await _selectDate(picked);
     }
@@ -427,7 +458,12 @@ class _RoundButton extends StatelessWidget {
           color: AppColors.white,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 19, color: AppColors.navy900),
+        // Pinned: Flutter mirrors chevrons in RTL, and these follow the
+        // photo's physical corners, not the reading direction.
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Icon(icon, size: 19, color: AppColors.navy900),
+        ),
       ),
     );
   }
@@ -589,11 +625,7 @@ class _SectionRow extends StatelessWidget {
                     .labelSmall
                     ?.copyWith(color: AppColors.orange500, fontSize: 11),
               ),
-              const Icon(
-                Icons.chevron_left,
-                size: 14,
-                color: AppColors.orange500,
-              ),
+              const FixedChevron(size: 14, color: AppColors.orange500),
             ],
           ),
         ),

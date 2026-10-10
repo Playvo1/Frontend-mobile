@@ -20,8 +20,15 @@ import '../screens/account/account_screen.dart';
 import '../screens/account/edit_profile_screen.dart';
 import '../screens/assistant/assistant_screen.dart';
 import '../screens/booking/booking_confirmation_screen.dart';
+import '../screens/notifications/notification_settings_screen.dart';
+import '../screens/notifications/notifications_screen.dart';
 import '../screens/offline_screen.dart';
+import '../screens/settings/change_password_screen.dart';
+import '../screens/settings/data_access_screen.dart';
+import '../screens/settings/data_protection_screen.dart';
+import '../screens/settings/privacy_security_screen.dart';
 import '../screens/rating/rating_screen.dart';
+import '../screens/bookings/booking_detail_screen.dart';
 import '../screens/bookings/my_bookings_screen.dart';
 import '../screens/favorites/favorites_screen.dart';
 import '../screens/venues/venue_details_screen.dart';
@@ -162,10 +169,14 @@ class AppRouter {
   static Future<void> toVenueMap(
     BuildContext context, {
     required VenueFilters filters,
+    int? focusedVenueId,
   }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => VenueMapScreen(filters: filters),
+        builder: (_) => VenueMapScreen(
+          filters: filters,
+          focusedVenueId: focusedVenueId,
+        ),
       ),
     );
   }
@@ -224,10 +235,18 @@ class AppRouter {
     );
   }
 
-  static Future<void> toRating(BuildContext context) {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const RatingScreen()),
+  /// Opens the rating screen for one booking. Resolves true when a rating
+  /// was sent, so the caller can stop prompting for it.
+  static Future<bool> toRating(
+    BuildContext context, {
+    Booking? booking,
+  }) async {
+    final bool? rated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => RatingScreen(booking: booking),
+      ),
     );
+    return rated ?? false;
   }
 
   /// Opens the offline explainer. [onRetry] runs after it closes, so the
@@ -244,6 +263,65 @@ class AppRouter {
             Navigator.of(screenContext).pop();
             onRetry();
           },
+        ),
+      ),
+    );
+  }
+
+  static Future<void> toNotifications(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
+    );
+  }
+
+  static Future<void> toPrivacySecurity(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const PrivacySecurityScreen()),
+    );
+  }
+
+  static Future<void> toChangePassword(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const ChangePasswordScreen()),
+    );
+  }
+
+  static Future<void> toDataProtection(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const DataProtectionScreen()),
+    );
+  }
+
+  static Future<void> toDataAccess(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const DataAccessScreen()),
+    );
+  }
+
+  /// The notification preferences, opened from the settings list. The home
+  /// bell still opens the inbox itself.
+  static Future<void> toNotificationSettings(BuildContext context) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const NotificationSettingsScreen(),
+      ),
+    );
+  }
+
+  /// One reservation in full. The callbacks stay with the list screen,
+  /// which owns the data and refreshes after either action.
+  static Future<void> toBookingDetail(
+    BuildContext context, {
+    required Booking booking,
+    required VoidCallback onCancel,
+    required VoidCallback onRate,
+  }) {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BookingDetailScreen(
+          booking: booking,
+          onCancel: onCancel,
+          onRate: onRate,
         ),
       ),
     );

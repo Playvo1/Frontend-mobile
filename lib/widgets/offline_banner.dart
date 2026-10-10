@@ -4,6 +4,7 @@ import '../core/offline_state.dart';
 import '../core/sync_time_format.dart';
 import '../l10n/l10n.dart';
 import '../theme/app_colors.dart';
+import 'fixed_chevron.dart';
 import '../theme/app_spacing.dart';
 
 /// The strip shown above a list when it is being served from the cache, so
@@ -72,11 +73,7 @@ class OfflineBanner extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const Icon(
-                      Icons.chevron_left,
-                      size: 17,
-                      color: AppColors.orange700,
-                    ),
+                    const FixedChevron(size: 17, color: AppColors.orange700),
                   ],
                 ),
               ),

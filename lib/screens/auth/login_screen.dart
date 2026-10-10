@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'package:google_sign_in/google_sign_in.dart';
+
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+
 import '../../core/api_exception.dart';
 import '../../core/api_response.dart';
 import '../../core/app_router.dart';
@@ -19,11 +20,6 @@ import '../../widgets/error_banner.dart';
 import '../../widgets/google_button.dart';
 import '../../widgets/or_divider.dart';
 import '../../widgets/primary_button.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-
-import '../../core/api_exception.dart';
-import '../../core/api_response.dart';
-import '../../models/auth_session.dart';
 
 /// Email + password sign-in, plus the Google entry point.
 ///

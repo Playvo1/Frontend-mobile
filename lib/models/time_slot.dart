@@ -44,12 +44,19 @@ class TimeSlot {
       };
 
   factory TimeSlot.fromJson(Map<String, dynamic> json) {
+    // Confirmed against a live response: availability is a `status`
+    // string, the price is a decimal string, and times carry seconds.
+    final dynamic rawPrice = json['hourly_price'] ?? json['price'];
+    final String? status = json['status'] as String?;
+
     return TimeSlot(
       id: json['id'] as int,
       startTime: _hhmm(json['start_time'] as String? ?? ''),
       endTime: _hhmm(json['end_time'] as String? ?? ''),
-      isAvailable: json['is_available'] as bool? ?? true,
-      price: (json['price'] as num?)?.round(),
+      isAvailable: json['is_available'] as bool? ?? status == 'available',
+      price: rawPrice is num
+          ? rawPrice.round()
+          : double.tryParse(rawPrice?.toString() ?? '')?.round(),
     );
   }
 

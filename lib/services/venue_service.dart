@@ -1,6 +1,7 @@
 import '../core/api_client.dart';
 import '../core/api_response.dart';
 import '../core/app_config.dart';
+import '../models/time_slot.dart';
 import '../models/venue.dart';
 import '../models/venue_details.dart';
 import '../models/venue_filters.dart';
@@ -24,6 +25,16 @@ abstract class VenueService {
 
   /// One venue with its photos, amenities and the slots for [date].
   Future<ApiResponse<VenueDetails>> details(int venueId, {DateTime? date});
+
+  /// `GET /venues/{id}/time-slots` — the bookable hours for one day.
+  ///
+  /// The backend serves these separately from the venue, so availability
+  /// can be refreshed when the player switches date without refetching
+  /// photos and amenities.
+  Future<ApiResponse<List<TimeSlot>>> timeSlots(
+    int venueId, {
+    required DateTime date,
+  });
 
   /// SRS FR-17. The venues the player has hearted.
   Future<ApiResponse<List<Venue>>> favorites();
@@ -76,9 +87,31 @@ class ApiVenueService implements VenueService {
   }
 
   @override
+  Future<ApiResponse<List<TimeSlot>>> timeSlots(
+    int venueId, {
+    required DateTime date,
+  }) {
+    return _client.get<List<TimeSlot>>(
+      '/venues/$venueId/time-slots',
+      query: <String, String>{'date': VenueFilters.formatDate(date)},
+      parseData: (dynamic data) {
+        // Laravel returns either a bare array or a paginated envelope.
+        final List<dynamic> items = data is Map<String, dynamic>
+            ? (data['data'] as List<dynamic>? ?? <dynamic>[])
+            : (data as List<dynamic>);
+        return items
+            .map((dynamic s) => TimeSlot.fromJson(s as Map<String, dynamic>))
+            .toList();
+      },
+    );
+  }
+
+  @override
   Future<ApiResponse<List<Venue>>> favorites() {
     return _client.get<List<Venue>>(
-      '/venues/favorites',
+      // Confirmed by the backend: the list lives at /favorites, not under
+      // /venues. Adding and removing still go through the venue.
+      '/favorites',
       authenticated: true,
       parseData: _parseVenueList,
     );

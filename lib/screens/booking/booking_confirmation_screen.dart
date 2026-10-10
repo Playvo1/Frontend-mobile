@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_router.dart';
+import '../../core/booking_share.dart';
 import '../../l10n/l10n.dart';
 import '../../models/booking.dart';
 import '../../models/time_slot.dart';
@@ -98,6 +99,25 @@ class BookingConfirmationScreen extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             const _ImportantNotes(),
             const SizedBox(height: AppSpacing.xl),
+            OutlinedButton(
+              onPressed: () async {
+                final bool shared = await BookingShare.share(booking, l10n);
+                if (!shared && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.shareUnavailable)),
+                  );
+                }
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  const Icon(Icons.ios_share, size: 17),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(l10n.shareBooking),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             ElevatedButton(
               onPressed: () => AppRouter.switchTab(context, AppTab.bookings),
               child: Row(
@@ -284,20 +304,22 @@ class _ImportantNotes extends StatelessWidget {
           for (final String note in notes)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
+              // The bullet comes first, which puts it on the right of the
+              // line in Arabic.
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  const Padding(
+                    padding: EdgeInsets.only(top: 7, right: 2, left: 7),
+                    child: CircleAvatar(
+                      radius: 2.5,
+                      backgroundColor: AppColors.navy300,
+                    ),
+                  ),
                   Expanded(
                     child: Text(
                       note,
                       style: textTheme.labelSmall?.copyWith(height: 1.6),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6, right: 6, left: 6),
-                    child: CircleAvatar(
-                      radius: 2,
-                      backgroundColor: AppColors.navy300,
                     ),
                   ),
                 ],

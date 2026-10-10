@@ -14,11 +14,10 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/app_bottom_nav.dart';
-import '../../widgets/back_circle_button.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/booking_stepper.dart';
 import '../../widgets/booking_summary_card.dart';
 import '../../widgets/error_banner.dart';
-import '../../widgets/playvo_logo.dart';
 
 /// Step 1 of 3: who is booking. Creating the booking here returns its id,
 /// which step 2 needs to attach the payment receipt to.
@@ -91,6 +90,13 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         );
         return;
       }
+      // A slot taken between opening the form and submitting it is not a
+      // form error — the player has to pick a different time, so it gets
+      // its own dialog rather than a line of red text.
+      if (response.isConflict) {
+        await _showSlotTaken();
+        return;
+      }
       setState(
         () => _errorMessage =
             response.errorFor('time_slot_id') ?? response.message,
@@ -106,6 +112,24 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       if (mounted) {
         setState(() => _isSubmitting = false);
       }
+    }
+  }
+
+  /// Explains that the slot went and sends the player back to the grid.
+  Future<void> _showSlotTaken() async {
+    final AppLocalizations l10n = context.l10n;
+    await ConfirmDialog.show(
+      context,
+      icon: Icons.event_busy_outlined,
+      title: l10n.slotTakenTitle,
+      body: l10n.slotTakenBody,
+      confirmLabel: l10n.pickAnotherTime,
+      cancelLabel: l10n.cancel,
+    );
+    if (mounted) {
+      // Either answer leads back to the venue page: the booking cannot
+      // continue against a slot that is gone.
+      Navigator.of(context).pop();
     }
   }
 
@@ -303,9 +327,6 @@ class BookingHeader extends StatelessWidget {
             ),
           ],
         ),
-        // A small explicit gap: the proportional default tucks the
-        // wordmark too close to the mark at this size.
-        const PlayvoLogo(markHeight: 44, wordmarkSize: 13, gap: -3),
         const AppBackButton(size: 34),
       ],
     );

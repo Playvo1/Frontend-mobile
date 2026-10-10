@@ -10,8 +10,10 @@ import '../models/venue.dart';
 import '../models/venue_filters.dart';
 import '../services/venue_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/fixed_chevron.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/app_bottom_nav.dart';
+import '../widgets/assistant_fab.dart';
 import '../widgets/city_picker_sheet.dart';
 import '../widgets/error_banner.dart';
 import '../widgets/home_search_field.dart';
@@ -184,6 +186,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.grey100,
+      floatingActionButtonLocation:
+          FloatingActionButtonLocation.startFloat,
+      floatingActionButton: const AssistantFab(),
       bottomNavigationBar: AppBottomNav(
         current: AppTab.home,
         // Only the home tab is built so far.
@@ -207,8 +212,10 @@ class _HomeScreenState extends State<HomeScreen> {
               _Header(
                 city: _selectedCity,
                 onCityPressed: _pickCity,
-                onNotificationsPressed: _showComingSoon,
-                onProfilePressed: _showComingSoon,
+                onNotificationsPressed: () =>
+                    AppRouter.toNotifications(context),
+                onProfilePressed: () =>
+                    AppRouter.switchTab(context, AppTab.account),
               ),
               const SizedBox(height: AppSpacing.sm),
               const Center(child: PlayvoLogo(markHeight: 76, wordmarkSize: 20)),
@@ -469,11 +476,7 @@ class _SectionHeader extends StatelessWidget {
                     .labelSmall
                     ?.copyWith(color: AppColors.orange500),
               ),
-              const Icon(
-                Icons.chevron_left,
-                size: 15,
-                color: AppColors.orange500,
-              ),
+              const FixedChevron(size: 15, color: AppColors.orange500),
             ],
           ),
         ),

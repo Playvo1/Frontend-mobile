@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
+
 import '../core/api_client.dart';
 import '../core/api_response.dart';
+import '../core/push_notifications.dart';
 import '../core/token_storage.dart';
 import '../models/auth_session.dart';
 import '../models/registration_result.dart';
@@ -152,6 +155,13 @@ Future<ApiResponse<void>> resetPassword({
   /// stale credential on the device.
   Future<ApiResponse<void>> logout() async {
     try {
+      // Revoked before the session token is cleared, since the call needs
+      // it. A failure here must not block signing out.
+      try {
+        await PushNotifications().stop();
+      } on Object catch (error) {
+        debugPrint('Push revocation skipped: $error');
+      }
       return await _client.post<void>('/auth/logout', authenticated: true);
     } finally {
       await _tokenStorage.clear();
@@ -164,6 +174,15 @@ Future<ApiResponse<void>> resetPassword({
     final AuthSession? session = response.data;
     if (response.success && session != null) {
       await _tokenStorage.write(session.token);
+      // The device token is only useful once it can be tied to an account,
+      // so it is registered here rather than on launch. Push is a
+      // side-effect of signing in, never a condition for it, so a failure
+      // here must not fail the sign-in.
+      try {
+        await PushNotifications().start();
+      } on Object catch (error) {
+        debugPrint('Push registration skipped: $error');
+      }
     }
   }
 }

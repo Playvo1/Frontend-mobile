@@ -35,6 +35,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_5.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5204,
+      longitude: 34.4367,
     ),
     const Venue(
       id: 2,
@@ -48,6 +50,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_3.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5133,
+      longitude: 34.442,
     ),
     const Venue(
       id: 3,
@@ -61,6 +65,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_4.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5281,
+      longitude: 34.453,
     ),
     const Venue(
       id: 4,
@@ -74,6 +80,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_1.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5311,
+      longitude: 34.427,
     ),
     const Venue(
       id: 5,
@@ -87,6 +95,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_2.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5068,
+      longitude: 34.4612,
     ),
   ];
 
@@ -159,6 +169,21 @@ class MockVenueService implements VenueService {
         price: venue.hourlyPrice,
       );
     });
+  }
+
+  @override
+  Future<ApiResponse<List<TimeSlot>>> timeSlots(
+    int venueId, {
+    required DateTime date,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final ApiResponse<VenueDetails> response =
+        await details(venueId, date: date);
+    return ApiResponse<List<TimeSlot>>(
+      success: true,
+      message: '',
+      data: response.data?.timeSlots ?? <TimeSlot>[],
+    );
   }
 
   @override

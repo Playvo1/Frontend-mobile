@@ -95,8 +95,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               _Label(text: l10n.fullNameLabel, isRequired: true),
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(
+                decoration: InputDecoration(
+                  hintText: l10n.fullNameHint,
+                  prefixIcon: const Icon(
                     Icons.person_outline,
                     size: 19,
                     color: AppColors.navy300,
@@ -109,8 +110,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(
+                decoration: InputDecoration(
+                  hintText: l10n.emailPlaceholder,
+                  prefixIcon: const Icon(
                     Icons.mail_outline,
                     size: 19,
                     color: AppColors.navy300,
@@ -123,8 +125,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(
+                decoration: InputDecoration(
+                  hintText: l10n.phonePlaceholder,
+                  prefixIcon: const Icon(
                     Icons.call_outlined,
                     size: 19,
                     color: AppColors.navy300,

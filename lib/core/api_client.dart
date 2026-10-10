@@ -194,7 +194,11 @@ class ApiClient {
       throw ApiException(ApiFailureKind.malformedResponse, e.message);
     }
 
-    return ApiResponse<T>.fromJson(json, parseData: parseData);
+    return ApiResponse<T>.fromJson(
+      json,
+      parseData: parseData,
+      statusCode: response.statusCode,
+    );
   }
 
   void close() => _http.close();

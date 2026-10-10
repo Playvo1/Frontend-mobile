@@ -2,25 +2,23 @@ import 'package:flutter/material.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/app_router.dart';
-import '../../core/locale_controller.dart';
+import '../../widgets/confirm_dialog.dart';
+import '../../widgets/language_sheet.dart';
 import '../../l10n/l10n.dart';
-import '../../models/booking.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
-import '../../services/booking_service.dart';
 import '../../theme/app_colors.dart';
+import '../../widgets/fixed_chevron.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/app_bottom_nav.dart';
-import '../../widgets/venue_photo.dart';
 
 /// "حسابي" — the player's profile, their past matches, and the settings
 /// list that ends in log out.
 class AccountScreen extends StatefulWidget {
-  const AccountScreen({super.key, this.authService, this.bookingService});
+  const AccountScreen({super.key, this.authService});
 
   final AuthService? authService;
-  final BookingService? bookingService;
 
   @override
   State<AccountScreen> createState() => _AccountScreenState();
@@ -28,11 +26,8 @@ class AccountScreen extends StatefulWidget {
 
 class _AccountScreenState extends State<AccountScreen> {
   late final AuthService _authService = widget.authService ?? AuthService();
-  late final BookingService _bookingService =
-      widget.bookingService ?? BookingService.create();
 
   User? _user;
-  List<Booking> _pastMatches = <Booking>[];
   bool _isLoading = true;
 
   @override
@@ -44,18 +39,10 @@ class _AccountScreenState extends State<AccountScreen> {
   Future<void> _load() async {
     try {
       final User? user = (await _authService.me()).data;
-      final List<Booking> bookings =
-          (await _bookingService.myBookings()).data ?? <Booking>[];
       if (!mounted) {
         return;
       }
-      setState(() {
-        _user = user;
-        // Only finished games belong in the history list.
-        _pastMatches = bookings
-            .where((Booking b) => b.status == BookingStatus.completed)
-            .toList();
-      });
+      setState(() => _user = user);
     } on ApiException {
       // The screen still renders; the profile block simply stays empty.
     } finally {
@@ -66,6 +53,19 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Future<void> _logOut() async {
+    final AppLocalizations l10n = context.l10n;
+    final bool confirmed = await ConfirmDialog.show(
+      context,
+      icon: Icons.logout,
+      title: l10n.logoutConfirmTitle,
+      body: l10n.logoutConfirmBody,
+      confirmLabel: l10n.logOut,
+      cancelLabel: l10n.cancel,
+    );
+    if (!confirmed) {
+      return;
+    }
+
     try {
       await _authService.logout();
     } on ApiException {
@@ -100,18 +100,6 @@ class _AccountScreenState extends State<AccountScreen> {
                     onEdit: () => AppRouter.toEditProfile(context, _user),
                   ),
                   const SizedBox(height: AppSpacing.xl),
-                  _SectionHeader(
-                    icon: Icons.history,
-                    title: l10n.matchHistory,
-                    actionLabel: l10n.viewAllShort,
-                    onAction: () =>
-                        AppRouter.switchTab(context, AppTab.bookings),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  ..._pastMatches.map(
-                    (Booking booking) => _MatchCard(booking: booking),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
                   _SectionHeader(icon: Icons.settings_outlined, title: l10n.settings),
                   const SizedBox(height: AppSpacing.md),
                   _SettingsList(onLogOut: _logOut),
@@ -144,8 +132,12 @@ class _ProfileCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
+          // The avatar leads the row, which puts it on the right in Arabic,
+          // with the name and contact details to its left.
           Row(
             children: <Widget>[
+              const _Avatar(size: 64),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,8 +163,6 @@ class _ProfileCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              const _Avatar(size: 64),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -317,90 +307,11 @@ class _SectionHeader extends StatelessWidget {
                   actionLabel!,
                   style: textTheme.labelSmall?.copyWith(fontSize: 11),
                 ),
-                const Icon(
-                  Icons.chevron_left,
-                  size: 15,
-                  color: AppColors.navy300,
-                ),
+                const FixedChevron(size: 15, color: AppColors.navy300),
               ],
             ),
           ),
       ],
-    );
-  }
-}
-
-/// One finished match in the history list.
-class _MatchCard extends StatelessWidget {
-  const _MatchCard({required this.booking});
-
-  final Booking booking;
-
-  @override
-  Widget build(BuildContext context) {
-    final AppLocalizations l10n = context.l10n;
-    final TextTheme textTheme = Theme.of(context).textTheme;
-    final DateTime date = booking.date ?? DateTime.now();
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppSpacing.sm + 2),
-        border: Border.all(color: AppColors.fieldBorder),
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.statusCompletedBackground,
-              borderRadius: BorderRadius.circular(AppSpacing.sm),
-            ),
-            child: Text(
-              l10n.matchCompleted,
-              style: textTheme.labelSmall?.copyWith(
-                color: AppColors.statusCompleted,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text(
-                  booking.venue?.name ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.labelMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${date.day}/${date.month}/${date.year}  ·  '
-                  '${booking.slot?.range ?? ''}',
-                  textDirection: TextDirection.ltr,
-                  style: textTheme.labelSmall?.copyWith(fontSize: 10),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          SizedBox(
-            width: 68,
-            height: 48,
-            child: VenuePhoto(
-              url: booking.venue?.coverPhoto,
-              borderRadius: BorderRadius.circular(AppSpacing.sm),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -425,20 +336,20 @@ class _SettingsList extends StatelessWidget {
           _SettingsRow(
             icon: Icons.notifications_none,
             label: l10n.settingsNotifications,
-            onTap: () {},
+            onTap: () => AppRouter.toNotificationSettings(context),
           ),
           const Divider(height: 1),
           _SettingsRow(
             icon: Icons.language,
             label: l10n.settingsLanguage,
             value: l10n.languageLabel,
-            onTap: LocaleController.toggle,
+            onTap: () => LanguageSheet.show(context),
           ),
           const Divider(height: 1),
           _SettingsRow(
             icon: Icons.shield_outlined,
             label: l10n.settingsPrivacy,
-            onTap: () {},
+            onTap: () => AppRouter.toPrivacySecurity(context),
           ),
           const Divider(height: 1),
           _SettingsRow(
@@ -487,8 +398,12 @@ class _SettingsRow extends StatelessWidget {
           horizontal: AppSpacing.md,
           vertical: AppSpacing.md,
         ),
+        // Icon then label, so they stay together on the reading edge; the
+        // value is pushed to the far side.
         child: Row(
           children: <Widget>[
+            Icon(icon, size: 19, color: tint),
+            const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Text(
                 label,
@@ -500,8 +415,6 @@ class _SettingsRow extends StatelessWidget {
                 value!,
                 style: textTheme.labelSmall?.copyWith(fontSize: 11),
               ),
-            const SizedBox(width: AppSpacing.sm),
-            Icon(icon, size: 19, color: tint),
           ],
         ),
       ),

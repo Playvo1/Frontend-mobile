@@ -50,7 +50,7 @@ class _VenueFilterSheetState extends State<VenueFilterSheet> {
       // A booking cannot be made further out than the owners publish slots.
       lastDate: now.add(const Duration(days: 90)),
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() => _draft = _draft.copyWith(date: picked));
     }
   }
@@ -60,7 +60,7 @@ class _VenueFilterSheetState extends State<VenueFilterSheet> {
       context: context,
       initialTime: _draft.time ?? TimeOfDay.now(),
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() => _draft = _draft.copyWith(time: picked));
     }
   }
@@ -133,11 +133,8 @@ class _VenueFilterSheetState extends State<VenueFilterSheet> {
                   : () => setState(
                         () => _draft = _draft.copyWith(sportType: null),
                       ),
-              child: _Dropdown<String>(
+              child: _SportDropdown(
                 value: _draft.sportType,
-                hint: l10n.sportFootball,
-                items: SportType.all,
-                labelBuilder: (String _) => l10n.sportFootball,
                 onChanged: (String? sport) =>
                     setState(() => _draft = _draft.copyWith(sportType: sport)),
               ),
@@ -523,6 +520,87 @@ class _RatingChips extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The sport field. Football is the only one the MVP covers, so the rest
+/// are listed but disabled and tagged "قريباً" — the roadmap is visible
+/// without offering data that does not exist (SRS 1.5.2).
+class _SportDropdown extends StatelessWidget {
+  const _SportDropdown({required this.value, required this.onChanged});
+
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  static String _label(String sport, AppLocalizations l10n) {
+    switch (sport) {
+      case SportType.basketball:
+        return l10n.sportBasketball;
+      case SportType.volleyball:
+        return l10n.sportVolleyball;
+      case SportType.tennis:
+        return l10n.sportTennis;
+      default:
+        return l10n.sportFootball;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final AppLocalizations l10n = context.l10n;
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      icon: const Icon(Icons.keyboard_arrow_down, color: AppColors.navy300),
+      hint: Text(l10n.sportFootball, style: textTheme.bodySmall),
+      style: textTheme.bodyMedium,
+      decoration: const InputDecoration(
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+      ),
+      items: <DropdownMenuItem<String>>[
+        for (final String sport in SportType.available)
+          DropdownMenuItem<String>(
+            value: sport,
+            child: Text(_label(sport, l10n)),
+          ),
+        for (final String sport in SportType.comingSoon)
+          DropdownMenuItem<String>(
+            value: sport,
+            enabled: false,
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    _label(sport, l10n),
+                    style: textTheme.bodyMedium
+                        ?.copyWith(color: AppColors.grey400),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.grey100,
+                    borderRadius: BorderRadius.circular(AppSpacing.sm),
+                  ),
+                  child: Text(
+                    l10n.comingSoonTag,
+                    style: textTheme.labelSmall?.copyWith(fontSize: 10),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+      onChanged: onChanged,
     );
   }
 }

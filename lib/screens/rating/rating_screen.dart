@@ -1,26 +1,41 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api_exception.dart';
+import '../../core/api_response.dart';
+import '../../core/failure_messages.dart';
 import '../../l10n/l10n.dart';
+import '../../models/booking.dart';
+import '../../services/booking_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_back_button.dart';
+import '../../widgets/app_illustration.dart';
+import '../../widgets/error_banner.dart';
 
 /// "تقييم تجربتك" — a star score, what the player liked, and a free note.
 ///
-/// TODO(api): no feedback endpoint exists yet. Sending currently confirms
-/// locally; point it at the endpoint once the backend adds one.
+/// Opened for one finished booking (FR-13). [booking] is null only in the
+/// gallery, where the screen is reviewed on its own.
 class RatingScreen extends StatefulWidget {
-  const RatingScreen({super.key});
+  const RatingScreen({super.key, this.booking, this.bookingService});
+
+  final Booking? booking;
+  final BookingService? bookingService;
 
   @override
   State<RatingScreen> createState() => _RatingScreenState();
 }
 
 class _RatingScreenState extends State<RatingScreen> {
+  late final BookingService _bookingService =
+      widget.bookingService ?? BookingService.create();
+
   final TextEditingController _notesController = TextEditingController();
 
   int _stars = 0;
   final Set<String> _selectedTags = <String>{};
+  bool _isSending = false;
+  String? _errorMessage;
 
   /// The design caps the note at 500 characters and shows the count.
   static const int _notesLimit = 500;
@@ -54,11 +69,54 @@ class _RatingScreenState extends State<RatingScreen> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    final AppLocalizations l10n = context.l10n;
+    final Booking? booking = widget.booking;
+
+    // In the gallery there is no booking to attach the rating to, so the
+    // screen just confirms.
+    if (booking == null) {
+      _confirmAndClose(l10n);
+      return;
+    }
+
+    setState(() {
+      _isSending = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final ApiResponse<void> response = await _bookingService.rate(
+        bookingId: booking.id,
+        stars: _stars,
+        tags: _selectedTags.toList(),
+        notes: _notesController.text.trim(),
+      );
+      if (!mounted) {
+        return;
+      }
+      if (response.success) {
+        _confirmAndClose(l10n);
+        return;
+      }
+      setState(() => _errorMessage = response.message);
+    } on ApiException catch (exception) {
+      if (mounted) {
+        setState(() => _errorMessage = FailureMessages.of(exception, l10n));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
+  }
+
+  void _confirmAndClose(AppLocalizations l10n) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(context.l10n.ratingSent)),
+      SnackBar(content: Text(l10n.ratingSent)),
     );
-    Navigator.of(context).pop();
+    // true tells the bookings list this booking has now been rated.
+    Navigator.of(context).pop(true);
   }
 
   @override
@@ -192,10 +250,21 @@ class _RatingScreenState extends State<RatingScreen> {
               ),
             ),
             const SizedBox(height: AppSpacing.xl),
+            ErrorBanner(message: _errorMessage),
             ElevatedButton(
-              // A rating with no stars says nothing, so it cannot be sent.
-              onPressed: _stars == 0 ? null : _submit,
-              child: Text(l10n.sendRating),
+              // A rating with no stars says nothing, so it cannot be sent;
+              // and a second tap must not send it twice.
+              onPressed: _stars == 0 || _isSending ? null : _submit,
+              child: _isSending
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.white,
+                      ),
+                    )
+                  : Text(l10n.sendRating),
             ),
             const SizedBox(height: AppSpacing.lg),
           ],
@@ -205,45 +274,15 @@ class _RatingScreenState extends State<RatingScreen> {
   }
 }
 
-/// The friendly mark above the rating panels.
+/// The robot holding a star, from the design.
 class _RatingMascot extends StatelessWidget {
   const _RatingMascot();
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 150,
+    return const AppIllustration(
+      asset: AppIllustration.ratingRobot,
       height: 150,
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          Container(
-            width: 140,
-            height: 140,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.successAccentHalo,
-            ),
-          ),
-          Container(
-            width: 104,
-            height: 104,
-            decoration: BoxDecoration(
-              color: AppColors.successAccent,
-              borderRadius: BorderRadius.circular(32),
-            ),
-            child: const Icon(
-              Icons.sentiment_satisfied_alt,
-              size: 52,
-              color: AppColors.white,
-            ),
-          ),
-          const PositionedDirectional(
-            bottom: 14,
-            child: Icon(Icons.star_rounded, size: 40, color: Color(0xFF2E7DF6)),
-          ),
-        ],
-      ),
     );
   }
 }

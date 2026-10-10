@@ -13,6 +13,23 @@ class AppConfig {
   defaultValue: 'http://10.166.0.178:8000/api/v1',
   );
 
+  /// The same host without the `/api/v1` suffix. Uploaded images come
+  /// back as server-relative paths ("/storage/venues/x.png"), so they need
+  /// the origin prefixed before they can be fetched.
+  static String get fileBaseUrl {
+    final int apiIndex = apiBaseUrl.indexOf('/api/');
+    return apiIndex == -1 ? apiBaseUrl : apiBaseUrl.substring(0, apiIndex);
+  }
+
+  /// Turns whatever the API gives for an image into something loadable:
+  /// an absolute URL is returned as-is, a relative path gets the origin.
+  static String resolveFileUrl(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    return '$fileBaseUrl${path.startsWith('/') ? '' : '/'}$path';
+  }
+
   static const Duration requestTimeout = Duration(seconds: 20);
 
   /// Uploading a receipt photo over a weak connection needs longer than a
