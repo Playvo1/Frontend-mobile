@@ -52,14 +52,14 @@ class AppRouter {
   static Future<void> toLoginAndClearStack(BuildContext context) {
     return Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const LoginScreen()),
-      (Route<dynamic> route) => false,
+          (Route<dynamic> route) => false,
     );
   }
 
   static Future<void> toHomeAndClearStack(BuildContext context) {
     return Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
-      (Route<dynamic> route) => false,
+          (Route<dynamic> route) => false,
     );
   }
 
@@ -76,16 +76,13 @@ class AppRouter {
   }
 
   static Future<void> toOtpVerification(
-    BuildContext context, {
-    required OtpPurpose purpose,
-    required String email,
-  }) {
+      BuildContext context, {
+        required OtpPurpose purpose,
+        required String email,
+      }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => OtpVerificationScreen(
-          purpose: purpose,
-          email: email,
-        ),
+        builder: (_) => OtpVerificationScreen(purpose: purpose, email: email),
       ),
     );
   }
@@ -93,22 +90,10 @@ class AppRouter {
   /// The email and the verified code are carried in, because
   /// `POST /auth/reset-password` needs all three of email, code and the new
   /// password in one request (Guidelines 7.2).
-
- static Future<void> toResetPassword(
-  BuildContext context, {
-  required String email,
-}) {
-  return Navigator.of(context).pushReplacement(
-    MaterialPageRoute<void>(
-      builder: (_) => ResetPasswordScreen(email: email),
-    ),
-  );
-}
-
   static Future<void> toResetPassword(
-    BuildContext context, {
-    required String email,
-  }) {
+      BuildContext context, {
+        required String email,
+      }) {
     return Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => ResetPasswordScreen(email: email),
@@ -116,20 +101,19 @@ class AppRouter {
     );
   }
 
-
   /// Shown once the password has actually been changed. The stack is
   /// cleared so Back cannot return into the spent reset flow.
   static Future<void> toResetSuccess(BuildContext context) {
     return Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => const ResetSuccessScreen()),
-      (Route<dynamic> route) => false,
+          (Route<dynamic> route) => false,
     );
   }
 
   static Future<void> toVenueSearch(
-    BuildContext context, {
-    required VenueFilters filters,
-  }) {
+      BuildContext context, {
+        required VenueFilters filters,
+      }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => VenueSearchScreen(initialFilters: filters),
@@ -148,18 +132,15 @@ class AppRouter {
   /// Step 1 of the booking. The slot travels as an object rather than an
   /// id, because both booking screens display its time and price.
   static Future<void> toBookingDetails(
-    BuildContext context, {
-    required Venue venue,
-    required TimeSlot slot,
-    required DateTime date,
-  }) {
+      BuildContext context, {
+        required Venue venue,
+        required TimeSlot slot,
+        required DateTime date,
+      }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => BookingDetailsScreen(
-          venue: venue,
-          slot: slot,
-          date: date,
-        ),
+        builder: (_) =>
+            BookingDetailsScreen(venue: venue, slot: slot, date: date),
       ),
     );
   }
@@ -167,12 +148,12 @@ class AppRouter {
   /// Step 2. Uses pushReplacement so Back cannot resubmit step 1 and
   /// create a second booking for the same slot.
   static Future<void> toPaymentProof(
-    BuildContext context, {
-    required Booking booking,
-    required Venue venue,
-    required TimeSlot slot,
-    required DateTime date,
-  }) {
+      BuildContext context, {
+        required Booking booking,
+        required Venue venue,
+        required TimeSlot slot,
+        required DateTime date,
+      }) {
     return Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => PaymentProofScreen(
@@ -186,10 +167,10 @@ class AppRouter {
   }
 
   static Future<void> toVenueMap(
-    BuildContext context, {
-    required VenueFilters filters,
-    int? focusedVenueId,
-  }) {
+      BuildContext context, {
+        required VenueFilters filters,
+        int? focusedVenueId,
+      }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => VenueMapScreen(
@@ -202,12 +183,12 @@ class AppRouter {
 
   /// Step 3. Replaces step 2 so Back cannot re-upload the receipt.
   static Future<void> toBookingConfirmation(
-    BuildContext context, {
-    required Booking booking,
-    required Venue venue,
-    required TimeSlot slot,
-    required DateTime date,
-  }) {
+      BuildContext context, {
+        required Booking booking,
+        required Venue venue,
+        required TimeSlot slot,
+        required DateTime date,
+      }) {
     return Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
         builder: (_) => BookingConfirmationScreen(
@@ -238,41 +219,31 @@ class AppRouter {
   static Future<void> _replaceRoot(BuildContext context, Widget screen) {
     return Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute<void>(builder: (_) => screen),
-      (Route<dynamic> route) => false,
+          (Route<dynamic> route) => false,
     );
   }
 
   static Future<void> toEditProfile(BuildContext context, User? user) {
     return Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EditProfileScreen(user: user),
-      ),
+      MaterialPageRoute<void>(builder: (_) => EditProfileScreen(user: user)),
     );
   }
 
   static Future<void> toAssistant(BuildContext context) {
     return Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const AssistantScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const AssistantScreen()),
     );
   }
-
 
   /// Opens the rating screen for one booking. Resolves true when a rating
   /// was sent, so the caller can stop prompting for it.
   static Future<bool> toRating(
-    BuildContext context, {
-    Booking? booking,
-  }) async {
+      BuildContext context, {
+        Booking? booking,
+      }) async {
     final bool? rated = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => RatingScreen(booking: booking),
-  static Future<void> toRating(BuildContext context) {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const RatingScreen(),
-
       ),
     );
     return rated ?? false;
@@ -281,9 +252,9 @@ class AppRouter {
   /// Opens the offline explainer. [onRetry] runs after it closes, so the
   /// screen that opened it refetches rather than staying stale.
   static Future<void> toOfflineScreen(
-    BuildContext context, {
-    required Future<void> Function() onRetry,
-  }) {
+      BuildContext context, {
+        required Future<void> Function() onRetry,
+      }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (BuildContext screenContext) => OfflineScreen(
@@ -340,11 +311,11 @@ class AppRouter {
   /// One reservation in full. The callbacks stay with the list screen,
   /// which owns the data and refreshes after either action.
   static Future<void> toBookingDetail(
-    BuildContext context, {
-    required Booking booking,
-    required VoidCallback onCancel,
-    required VoidCallback onRate,
-  }) {
+      BuildContext context, {
+        required Booking booking,
+        required VoidCallback onCancel,
+        required VoidCallback onRate,
+      }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => BookingDetailScreen(
@@ -355,6 +326,4 @@ class AppRouter {
       ),
     );
   }
-}
-
 }
