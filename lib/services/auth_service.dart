@@ -86,11 +86,19 @@ class AuthService {
 
   /// POST /auth/login/google — logs in or auto-registers from a Google
   /// ID token.
-  Future<ApiResponse<AuthSession>> loginWithGoogle(String idToken) async {
+
+  /// POST /auth/google — registers or logs in based on the mode.
+  Future<ApiResponse<AuthSession>> loginWithGoogle(
+    String idToken, {
+    required String mode,
+  }) async {
     final ApiResponse<AuthSession> response =
         await _client.post<AuthSession>(
       '/auth/google',
-      body: <String, dynamic>{'id_token': idToken},
+      body: <String, dynamic>{
+        'id_token': idToken,
+        'mode': mode,
+      },
       parseData: (dynamic data) =>
           AuthSession.fromJson(data as Map<String, dynamic>),
     );
@@ -98,6 +106,7 @@ class AuthService {
     await _persistIfAuthenticated(response);
     return response;
   }
+
 
   /// POST /auth/forgot-password — the response is identical whether or not
   /// the email exists, so the app must not branch on it.

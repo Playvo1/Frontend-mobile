@@ -158,7 +158,10 @@ Future<void> _handleGoogleSignup() async {
     }
 
     final ApiResponse<AuthSession> response =
-        await _authService.loginWithGoogle(idToken);
+        await _authService.loginWithGoogle(
+      idToken,
+      mode: 'register',
+     );
 
     if (!mounted) return;
 

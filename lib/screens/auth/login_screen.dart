@@ -215,7 +215,10 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       final ApiResponse<AuthSession> response =
-          await _authService.loginWithGoogle(idToken);
+          await _authService.loginWithGoogle(
+     idToken,
+     mode: 'login',
+    );
 
       if (!mounted) return;
 
