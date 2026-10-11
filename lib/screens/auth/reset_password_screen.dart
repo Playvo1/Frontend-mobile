@@ -14,36 +14,39 @@ import '../../widgets/error_banner.dart';
 import '../../widgets/primary_button.dart';
 
 /// Final step of the password-reset flow.
-///
-/// [email] and [code] are handed in by the OTP screen because
-/// `POST /auth/reset-password` takes all three of email, code and the new
-/// password in one request (Guidelines 7.2) — the code is single-use and is
-/// consumed here, not earlier.
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({
-  super.key,
-  required this.email,
-  this.authService,
-});
+    super.key,
+    required this.email,
+    required this.code,
+    this.authService,
+  });
 
-final String email;
-final AuthService? authService;
+  final String email;
+  final String code;
+  final AuthService? authService;
 
   @override
-  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+  State<ResetPasswordScreen> createState() =>
+      _ResetPasswordScreenState();
 }
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _passwordController = TextEditingController();
+
+  final TextEditingController _passwordController =
+      TextEditingController();
+
   final TextEditingController _confirmPasswordController =
       TextEditingController();
 
-  late final AuthService _authService = widget.authService ?? AuthService();
+  late final AuthService _authService =
+      widget.authService ?? AuthService();
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isSubmitting = false;
+
   String? _errorMessage;
 
   @override
@@ -64,33 +67,42 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     });
 
     try {
-      final ApiResponse<void> response = await _authService.resetPassword(
-       email: widget.email,
-      password: _passwordController.text,
-   );
+      final ApiResponse<void> response =
+          await _authService.resetPassword(
+        email: widget.email,
+        code: widget.code,
+        password: _passwordController.text,
+      );
 
       if (!mounted) {
         return;
       }
+
       if (response.success) {
         await AppRouter.toResetSuccess(context);
         return;
       }
-      // An expired or already-used code comes back on the `code` field.
-     setState(
-       () => _errorMessage =
-      response.errorFor('password') ?? response.message,
-    );
+
+      setState(() {
+        _errorMessage =
+            response.errorFor('code') ??
+            response.errorFor('password') ??
+            response.message;
+      });
     } on ApiException catch (exception) {
       if (!mounted) {
         return;
       }
-      setState(
-        () => _errorMessage = FailureMessages.of(exception, context.l10n),
-      );
+
+      setState(() {
+        _errorMessage =
+            FailureMessages.of(exception, context.l10n);
+      });
     } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
   }
@@ -109,14 +121,20 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           controller: _passwordController,
           obscureText: _obscurePassword,
           textInputAction: TextInputAction.next,
-          autofillHints: const <String>[AutofillHints.newPassword],
+          autofillHints: const <String>[
+            AutofillHints.newPassword,
+          ],
           leadingIcon: Icons.lock_outline,
           suffix: PasswordVisibilityToggle(
             isObscured: _obscurePassword,
-            onPressed: () =>
-                setState(() => _obscurePassword = !_obscurePassword),
+            onPressed: () {
+              setState(() {
+                _obscurePassword = !_obscurePassword;
+              });
+            },
           ),
-          validator: (String? value) => Validators.newPassword(value, l10n),
+          validator: (String? value) =>
+              Validators.newPassword(value, l10n),
         ),
         const SizedBox(height: AppSpacing.md),
         AppTextField(
@@ -128,11 +146,15 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           onFieldSubmitted: (_) => _handleReset(),
           suffix: PasswordVisibilityToggle(
             isObscured: _obscureConfirmPassword,
-            onPressed: () => setState(
-              () => _obscureConfirmPassword = !_obscureConfirmPassword,
-            ),
+            onPressed: () {
+              setState(() {
+                _obscureConfirmPassword =
+                    !_obscureConfirmPassword;
+              });
+            },
           ),
-          validator: (String? value) => Validators.confirmPassword(
+          validator: (String? value) =>
+              Validators.confirmPassword(
             value,
             _passwordController.text,
             l10n,

@@ -128,12 +128,14 @@ Future<ApiResponse<void>> verifyResetOtp({
 /// POST /auth/reset-password
 Future<ApiResponse<void>> resetPassword({
   required String email,
+  required String code,
   required String password,
 }) {
   return _client.post<void>(
     '/auth/reset-password',
     body: <String, dynamic>{
       'email': email,
+      'code': code,
       'password': password,
       'password_confirmation': password,
     },

@@ -1,13 +1,12 @@
+
 import '../core/api_response.dart';
+import '../models/time_slot.dart';
 import '../models/venue.dart';
+import '../models/venue_details.dart';
 import '../models/venue_filters.dart';
 import '../services/venue_service.dart';
 
-/// Sample venues so the home and filter screens can be built and reviewed
-/// before the venue endpoints exist — the SRS plans for exactly this
-/// (1.4: "the prototype relies entirely on mock data during development").
-///
-/// DEV ONLY. Delete `lib/dev/` once the real endpoints are connected.
+/// DEV ONLY: Sample venues for local development and UI review.
 class MockVenueService implements VenueService {
   MockVenueService();
 
@@ -72,14 +71,101 @@ class MockVenueService implements VenueService {
     ),
   ];
 
+  final Set<int> _favoriteIds = <int>{};
+
   @override
-  Future<ApiResponse<List<Venue>>> search(VenueFilters filters) async {
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    final List<Venue> matching =
-        _venues.where(filters.matches).toList(growable: false);
+  Future<ApiResponse<List<Venue>>> search(
+    VenueFilters filters, {
+    int page = 1,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    final List<Venue> matching = _venues
+        .where(filters.matches)
+        .map(
+          (Venue venue) =>
+              venue.copyWith(isFavorite: _favoriteIds.contains(venue.id)),
+        )
+        .toList(growable: false);
+
     return ApiResponse<List<Venue>>(
       success: true,
-      message: '',
+      message: 'Venues retrieved successfully',
+      data: matching,
+    );
+  }
+
+  @override
+  Future<ApiResponse<VenueDetails>> details(
+    int venueId, {
+    DateTime? date,
+  }) async {
+    final int index = _venues.indexWhere((Venue venue) => venue.id == venueId);
+
+    if (index == -1) {
+      return ApiResponse<VenueDetails>.failure('Venue not found');
+    }
+
+    // The mock venue details model may contain fields not represented by
+    // the Venue model. Keep this method aligned with VenueDetails.fromJson.
+    return ApiResponse<VenueDetails>.failure(
+      'Venue details are not configured in mock mode',
+    );
+  }
+
+  @override
+  Future<ApiResponse<List<TimeSlot>>> timeSlots(
+    int venueId, {
+    required DateTime date,
+    required int sportId,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+
+    final bool venueExists = _venues.any((Venue venue) => venue.id == venueId);
+
+    if (!venueExists) {
+      return ApiResponse<List<TimeSlot>>.failure('Venue not found');
+    }
+
+    return ApiResponse<List<TimeSlot>>(
+      success: true,
+      message: 'Time slots retrieved successfully',
+      data: <TimeSlot>[
+        const TimeSlot(
+          id: 1,
+          startTime: '17:00',
+          endTime: '18:00',
+          isAvailable: true,
+          price: 50,
+        ),
+        const TimeSlot(
+          id: 2,
+          startTime: '18:00',
+          endTime: '19:00',
+          isAvailable: true,
+          price: 50,
+        ),
+        const TimeSlot(
+          id: 3,
+          startTime: '19:00',
+          endTime: '20:00',
+          isAvailable: false,
+          price: 50,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<ApiResponse<List<Venue>>> favorites() async {
+    final List<Venue> matching = _venues
+        .where((Venue venue) => _favoriteIds.contains(venue.id))
+        .map((Venue venue) => venue.copyWith(isFavorite: true))
+        .toList(growable: false);
+
+    return ApiResponse<List<Venue>>(
+      success: true,
+      message: 'Favorites retrieved successfully',
       data: matching,
     );
   }
@@ -89,12 +175,22 @@ class MockVenueService implements VenueService {
     int venueId, {
     required bool isFavorite,
   }) async {
-    final int index = _venues.indexWhere((Venue v) => v.id == venueId);
-    _venues[index] = _venues[index].copyWith(isFavorite: isFavorite);
+    final int index = _venues.indexWhere((Venue venue) => venue.id == venueId);
+
+    if (index == -1) {
+      return ApiResponse<Venue>.failure('Venue not found');
+    }
+
+    if (isFavorite) {
+      _favoriteIds.add(venueId);
+    } else {
+      _favoriteIds.remove(venueId);
+    }
+
     return ApiResponse<Venue>(
       success: true,
-      message: '',
-      data: _venues[index],
+      message: 'Favorite updated successfully',
+      data: _venues[index].copyWith(isFavorite: isFavorite),
     );
   }
 }

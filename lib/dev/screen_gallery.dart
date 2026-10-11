@@ -43,8 +43,7 @@ import 'preview_auth_service.dart';
 /// team can review the UI without walking the flows or running a backend.
 ///
 /// DEV ONLY. It is reachable only when the app is built with
-/// `--dart-define=PLAYVO_GALLERY=true`, so it can never appear in a release
-/// build, and `lib/dev/` is deleted once the real API is connected.
+/// --dart-define=PLAYVO_GALLERY=true.
 class ScreenGallery extends StatelessWidget {
   const ScreenGallery({super.key});
 
@@ -57,7 +56,10 @@ class ScreenGallery extends StatelessWidget {
         foregroundColor: AppColors.white,
         actions: const <Widget>[
           Padding(
-            padding: EdgeInsets.only(left: AppSpacing.sm, right: AppSpacing.sm),
+            padding: EdgeInsets.only(
+              left: AppSpacing.sm,
+              right: AppSpacing.sm,
+            ),
             child: Center(child: LanguageSelector()),
           ),
         ],
@@ -121,11 +123,10 @@ class ScreenGallery extends StatelessWidget {
             title: 'Reset password',
             builder: (_) => ResetPasswordScreen(
               email: 'omar@example.com',
-              // code: '482913',
+              code: '482913',
               authService: PreviewAuthService.alwaysOk,
             ),
           ),
-
           _GalleryEntry(
             title: 'Reset password — success',
             subtitle: 'Shown after the password is actually changed',
@@ -182,7 +183,10 @@ class ScreenGallery extends StatelessWidget {
             title: 'Booking — step 2, payment proof',
             subtitle: 'Choosing a receipt needs a real device or emulator',
             builder: (_) => PaymentProofScreen(
-              booking: const Booking(id: 18, status: BookingStatus.pending),
+              booking: const Booking(
+                id: 18,
+                status: BookingStatus.pending,
+              ),
               venue: _sampleVenue,
               slot: _sampleSlot,
               date: DateTime.now(),
@@ -192,7 +196,10 @@ class ScreenGallery extends StatelessWidget {
           _GalleryEntry(
             title: 'Booking — step 3, confirmation',
             builder: (_) => BookingConfirmationScreen(
-              booking: const Booking(id: 258731, status: BookingStatus.pending),
+              booking: const Booking(
+                id: 258731,
+                status: BookingStatus.pending,
+              ),
               venue: _sampleVenue,
               slot: _sampleSlot,
               date: DateTime.now(),
