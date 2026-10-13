@@ -13,9 +13,28 @@ class Booking {
     this.score,
     this.shareToken,
     this.isRated = false,
+    this.holdExpiresAt,
+    this.venueId,
+    this.captainName,
+    this.captainPhone,
   });
 
   final int id;
+
+  /// The slot is held until this moment while the player uploads the
+  /// transfer receipt; after it passes the server releases the hour.
+  final DateTime? holdExpiresAt;
+
+  /// Read off the slot, since a booking never nests its venue.
+  final int? venueId;
+
+  final String? captainName;
+  final String? captainPhone;
+
+  /// True while the hold is still running, so the payment screen can show
+  /// the player how long is left.
+  bool get isHoldActive =>
+      holdExpiresAt != null && DateTime.now().isBefore(holdExpiresAt!);
 
   /// One of [BookingStatus].
   final String status;
@@ -83,38 +102,73 @@ class Booking {
 
   /// Returns a copy with the given fields replaced. Used where a single
   /// field changes locally, such as marking a booking rated.
-  Booking copyWith({String? status, bool? isRated}) {
+  Booking copyWith({String? status, bool? isRated, Venue? venue}) {
     return Booking(
       id: id,
       status: status ?? this.status,
-      venue: venue,
+      venue: venue ?? this.venue,
       slot: slot,
       date: date,
       totalPrice: totalPrice,
       score: score,
       shareToken: shareToken,
       isRated: isRated ?? this.isRated,
+      holdExpiresAt: holdExpiresAt,
+      venueId: venueId,
+      captainName: captainName,
+      captainPhone: captainPhone,
     );
   }
 
+  /// Reads both shapes the backend returns for a booking, confirmed
+  /// against the Postman collection:
+  ///
+  /// * `POST /bookings` answers with `{booking_id, total_price, status}`.
+  /// * The bookings list answers with the full row: `id`, `time_slot`,
+  ///   `captain`, `result`, `hold_expires_at`, `share_token`.
+  ///
+  /// Neither nests a venue and neither carries a `date` of its own, so the
+  /// day is read off the slot.
   factory Booking.fromJson(Map<String, dynamic> json) {
-    final String? rawDate = json['date'] as String?;
     final Map<String, dynamic>? venueJson =
         json['venue'] as Map<String, dynamic>?;
     final Map<String, dynamic>? slotJson =
         json['time_slot'] as Map<String, dynamic>?;
+    final TimeSlot? slot =
+        slotJson == null ? null : TimeSlot.fromJson(slotJson);
+
+    // The create response names the key `booking_id`, the list names it
+    // `id`. Reading both keeps one model for the whole flow.
+    final Object? rawId = json['id'] ?? json['booking_id'];
+    final String? rawDate = (json['date'] ?? slot?.slotDate) as String?;
 
     return Booking(
-      id: json['id'] as int,
-      status: json['status'] as String? ?? BookingStatus.pending,
+      id: rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0,
+      status: BookingStatus.normalise(json['status'] as String?),
       venue: venueJson == null ? null : Venue.fromJson(venueJson),
-      slot: slotJson == null ? null : TimeSlot.fromJson(slotJson),
+      slot: slot,
       date: rawDate == null ? null : DateTime.tryParse(rawDate),
-      totalPrice: (json['total_price'] as num?)?.round(),
-      score: json['score'] as String?,
+      // A decimal column, so it arrives as the string "500.00".
+      totalPrice: _money(json['total_price']),
+      // The owner records the final score in `result`.
+      score: (json['result'] ?? json['score'])?.toString(),
       shareToken: json['share_token'] as String?,
-      isRated: json['is_rated'] as bool? ?? false,
+      isRated: json['is_rated'] as bool? ?? json['rating'] != null,
+      holdExpiresAt:
+          DateTime.tryParse(json['hold_expires_at']?.toString() ?? ''),
+      venueId: slot?.venueId ?? json['venue_id'] as int?,
+      captainName: json['captain_name'] as String?,
+      captainPhone: json['captain_phone'] as String?,
     );
+  }
+
+  /// Money comes back as a decimal string ("500.00") on every endpoint,
+  /// and as a number only in the mock data.
+  static int? _money(dynamic raw) {
+    if (raw is num) {
+      return raw.round();
+    }
+    return double.tryParse(raw?.toString() ?? '')?.round();
   }
 }
 
@@ -126,6 +180,25 @@ class BookingStatus {
   static const String confirmed = 'confirmed';
   static const String cancelled = 'cancelled';
   static const String completed = 'completed';
+
+  /// What the server actually sends for a booking whose receipt has not
+  /// been verified yet. It means the same as [pending] to every screen.
+  static const String pendingPayment = 'pending_payment';
+
+  /// Maps the server's wording onto the four values the screens switch on,
+  /// in one place — so a new server spelling is a line here, not a hunt
+  /// through the UI. An unknown value is passed through rather than
+  /// forced, so it shows up instead of silently reading as "pending".
+  static String normalise(String? raw) {
+    final String value = (raw ?? '').trim();
+    if (value.isEmpty) {
+      return pending;
+    }
+    if (value == pendingPayment || value == 'awaiting_payment') {
+      return pending;
+    }
+    return value;
+  }
 }
 
 /// What the captain is to the team, sent as `captain_role`.

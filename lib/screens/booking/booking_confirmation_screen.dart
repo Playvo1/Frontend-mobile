@@ -67,14 +67,19 @@ class BookingConfirmationScreen extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             const BookingStepper(current: BookingStep.confirmation),
             const SizedBox(height: AppSpacing.xl),
-            const Center(child: SuccessMark()),
+            // Amber, not a green tick: the receipt has been received but an
+            // admin still has to verify it, and the slot is only held until
+            // then. A tick here reads as "paid and booked".
+            const Center(child: SuccessMark.pending()),
             const SizedBox(height: AppSpacing.lg),
             Text(
               l10n.bookingConfirmedTitleFull,
               textAlign: TextAlign.center,
               style: textTheme.headlineSmall,
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: AppSpacing.sm),
+            const Center(child: _AwaitingApprovalPill()),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               l10n.bookingConfirmedSubtitle,
               textAlign: TextAlign.center,
@@ -150,6 +155,50 @@ class BookingConfirmationScreen extends StatelessWidget {
 }
 
 /// The green strip confirming the receipt arrived.
+/// "بانتظار تأكيد الإدارة" — the one element that states the booking's real
+/// standing, placed directly under the title where the eye lands first.
+class _AwaitingApprovalPill extends StatelessWidget {
+  const _AwaitingApprovalPill();
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.orange50,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.orange100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const Icon(
+            Icons.schedule_rounded,
+            size: 15,
+            color: AppColors.warning,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            context.l10n.bookingAwaitingApproval,
+            style: textTheme.labelMedium?.copyWith(
+              color: AppColors.warning,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The receipt arrived; the money has not been verified. The box is amber
+/// for that reason — a green tick next to "payment" claims the transfer
+/// cleared, which is the one thing this screen cannot say yet.
 class _PaymentReceivedBox extends StatelessWidget {
   const _PaymentReceivedBox();
 
@@ -161,10 +210,11 @@ class _PaymentReceivedBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.successBackground,
+        color: AppColors.orange50,
         borderRadius: BorderRadius.circular(AppSpacing.radiusField),
+        border: Border.all(color: AppColors.orange100),
       ),
-      // The tick leads the row, which puts it on the right in Arabic.
+      // The icon leads the row, which puts it on the right in Arabic.
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -172,10 +222,14 @@ class _PaymentReceivedBox extends StatelessWidget {
             width: 24,
             height: 24,
             decoration: const BoxDecoration(
-              color: AppColors.success,
+              color: AppColors.warning,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check, size: 15, color: AppColors.white),
+            child: const Icon(
+              Icons.upload_file_rounded,
+              size: 14,
+              color: AppColors.white,
+            ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -185,7 +239,7 @@ class _PaymentReceivedBox extends StatelessWidget {
                 Text(
                   l10n.paymentConfirmedTitle,
                   style: textTheme.labelMedium?.copyWith(
-                    color: AppColors.success,
+                    color: AppColors.warning,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -193,6 +247,14 @@ class _PaymentReceivedBox extends StatelessWidget {
                 Text(
                   l10n.paymentConfirmedBody,
                   style: textTheme.labelSmall?.copyWith(height: 1.6),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.bookingNotConfirmedYet,
+                  style: textTheme.labelSmall?.copyWith(
+                    height: 1.6,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),

@@ -142,6 +142,11 @@ Future<ApiResponse<void>> resetPassword({
 
   /// GET /auth/me — used on launch to decide whether a stored token is
   /// still valid.
+  ///
+  /// TODO(api): not in the Postman collection. If the route does not
+  /// exist, the call returns 404 and the app treats the stored token as
+  /// expired, so the player is signed out on every launch. Ask the backend
+  /// for the session-check route and change the path here only.
   Future<ApiResponse<User>> me() {
     return _client.get<User>(
       '/auth/me',

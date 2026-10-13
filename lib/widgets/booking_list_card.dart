@@ -251,6 +251,16 @@ class _StatusBadge extends StatelessWidget {
         background = AppColors.statusCancelledBackground;
         icon = Icons.close;
         break;
+      // A booking whose receipt the admin has not verified yet is NOT the
+      // same as a confirmed one, and must not look like it: the slot is
+      // only held, so "قادم" would promise a reservation the player does
+      // not have.
+      case BookingStatus.pending:
+        label = l10n.statusAwaitingApproval;
+        color = AppColors.warning;
+        background = AppColors.orange50;
+        icon = Icons.hourglass_top_rounded;
+        break;
       default:
         label = l10n.statusUpcoming;
         color = AppColors.statusUpcoming;
