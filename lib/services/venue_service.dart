@@ -10,46 +10,48 @@ import 'cached_venue_service.dart';
 import 'mock_venue_service.dart';
 
 /// Reads venues for the home, search and details screens.
-///
-/// Abstract so the screens can run on mock data while the backend is being
-/// finished, and so they stay testable without a network (Guidelines 2.5).
 abstract class VenueService {
-  /// The implementation the app should use. Whichever source is active,
-  /// it is wrapped in [CachedVenueService] so every screen gets the
-  /// offline fallback without knowing about it.
+  /// The implementation the app should use.
   factory VenueService.create() => CachedVenueService(
-        AppConfig.useMockVenues ? MockVenueService() : ApiVenueService(),
-      );
+    AppConfig.useMockVenues ? MockVenueService() : ApiVenueService(),
+  );
 
   /// Venues matching [filters].
-  Future<ApiResponse<List<Venue>>> search(VenueFilters filters, {int page = 1});
+  Future<ApiResponse<List<Venue>>> search(
+      VenueFilters filters, {
+        int page = 1,
+      });
 
   /// One venue with its photos, amenities and the slots for [date].
-  Future<ApiResponse<VenueDetails>> details(int venueId, {DateTime? date});
+  Future<ApiResponse<VenueDetails>> details(
+      int venueId, {
+        DateTime? date,
+      });
 
-  /// The bookable hours for one day.
+  /// `GET /venues/{id}/time-slots` — the available hours for one venue,
+  /// date and sport.
   ///
-  /// There is no player-side slots endpoint: the collection has only
-  /// `/venue_owner/owner/venues/{id}/time-slots` (POST) and
-  /// `/venue_owner/owner/time-slots/{id}` (PUT). What the player can read
-  /// is the venue list, where every venue carries its full `time_slots`
-  /// array — so the implementation below filters that by date.
+  /// The implementation falls back to reading the hours off the venue list
+  /// when that route is not deployed: the Postman collection documents only
+  /// the owner-side `/venue_owner/owner/venues/{id}/time-slots`, while every
+  /// venue in `GET /venues` already carries its full `time_slots` array.
   Future<ApiResponse<List<TimeSlot>>> timeSlots(
-    int venueId, {
-    required DateTime date,
-  });
+      int venueId, {
+        required DateTime date,
+        required int sportId,
+      });
 
-  /// SRS FR-17. The venues the player has hearted.
+  /// Returns the venues the player has favorited.
   Future<ApiResponse<List<Venue>>> favorites();
 
-  /// SRS FR-17. Returns the venue as the server now holds it.
+  /// Updates the favorite status of a venue.
   Future<ApiResponse<Venue>> toggleFavorite(
-    int venueId, {
-    required bool isFavorite,
-  });
+      int venueId, {
+        required bool isFavorite,
+      });
 }
 
-/// The real implementation, wired to the paths in the Postman collection.
+/// Real API implementation.
 class ApiVenueService implements VenueService {
   ApiVenueService({ApiClient? client}) : _client = client ?? ApiClient();
 
@@ -61,13 +63,14 @@ class ApiVenueService implements VenueService {
   /// trailing `1` is a stray segment in the saved request, not a venue id,
   /// and the list route is `/venues`.
   static const String _listPath = '/venues';
+
   static String _detailsPath(int id) => '/venues/$id';
 
   @override
   Future<ApiResponse<List<Venue>>> search(
-    VenueFilters filters, {
-    int page = 1,
-  }) {
+      VenueFilters filters, {
+        int page = 1,
+      }) {
     return _client.get<List<Venue>>(
       _listPath,
       query: <String, String>{
@@ -79,7 +82,10 @@ class ApiVenueService implements VenueService {
   }
 
   @override
-  Future<ApiResponse<VenueDetails>> details(int venueId, {DateTime? date}) {
+  Future<ApiResponse<VenueDetails>> details(
+      int venueId, {
+        DateTime? date,
+      }) {
     return _client.get<VenueDetails>(
       _detailsPath(venueId),
       query: <String, String>{
@@ -92,25 +98,29 @@ class ApiVenueService implements VenueService {
 
   @override
   Future<ApiResponse<List<TimeSlot>>> timeSlots(
-    int venueId, {
-    required DateTime date,
-  }) async {
+      int venueId, {
+        required DateTime date,
+        required int sportId,
+      }) async {
     final String wanted = VenueFilters.formatDate(date);
 
-    // Preferred path, kept in case the backend adds it: the collection
-    // has no player-side route for slots, only the owner's. It is tried
-    // first and falls through quietly while it is missing.
+    // The documented path, tried first. On a deployment that does not serve
+    // it the call 404s and the venue list below answers instead, so the slot
+    // grid fills either way.
     try {
       final ApiResponse<List<TimeSlot>> response =
-          await _client.get<List<TimeSlot>>(
+      await _client.get<List<TimeSlot>>(
         '/venues/$venueId/time-slots',
-        query: <String, String>{'date': wanted},
+        query: <String, String>{
+          'date': wanted,
+          'sport_id': sportId.toString(),
+        },
         parseData: (dynamic data) {
           // Laravel returns either a bare array or a paginated envelope.
           final List<dynamic> items = data is Map<String, dynamic>
               ? (data['data'] as List<dynamic>? ?? <dynamic>[])
               : (data as List<dynamic>);
-          return _slotsForDate(items, wanted);
+          return _slotsForDate(items, wanted, sportId);
         },
       );
       if (response.success && (response.data?.isNotEmpty ?? false)) {
@@ -120,22 +130,23 @@ class ApiVenueService implements VenueService {
       // Route missing on this deployment; the list below still has them.
     }
 
-    return _slotsFromVenueList(venueId, wanted);
+    return _slotsFromVenueList(venueId, wanted, sportId);
   }
 
   /// Fallback for deployments where `GET /venues/{id}` omits `time_slots`
   /// but `GET /venues` includes every slot the venue has. The list is read
   /// page by page until the venue turns up, then its slots are filtered
-  /// down to the requested day.
+  /// down to the requested day and sport.
   Future<ApiResponse<List<TimeSlot>>> _slotsFromVenueList(
-    int venueId,
-    String wanted,
-  ) async {
+      int venueId,
+      String wanted,
+      int sportId,
+      ) async {
     const int maxPages = 5;
 
     for (int page = 1; page <= maxPages; page++) {
       final ApiResponse<List<TimeSlot>?> response =
-          await _client.get<List<TimeSlot>?>(
+      await _client.get<List<TimeSlot>?>(
         _listPath,
         query: <String, String>{'page': page.toString()},
         parseData: (dynamic data) {
@@ -150,6 +161,7 @@ class ApiVenueService implements VenueService {
             return _slotsForDate(
               venue['time_slots'] as List<dynamic>? ?? <dynamic>[],
               wanted,
+              sportId,
             );
           }
           return null; // Not on this page.
@@ -183,13 +195,18 @@ class ApiVenueService implements VenueService {
     );
   }
 
-  /// Parses raw slot maps and keeps only those on [wanted] (yyyy-MM-dd).
-  /// A slot with no `slot_date` is kept, since the endpoint that returns
-  /// it was already asked for one day.
-  static List<TimeSlot> _slotsForDate(List<dynamic> items, String wanted) {
+  /// Parses raw slot maps and keeps only those on [wanted] (yyyy-MM-dd) for
+  /// [sportId]. A slot missing either field is kept, since the endpoint that
+  /// returned it was already asked for one day and one sport.
+  static List<TimeSlot> _slotsForDate(
+      List<dynamic> items,
+      String wanted,
+      int sportId,
+      ) {
     final List<TimeSlot> slots = items
         .map((dynamic s) => TimeSlot.fromJson(s as Map<String, dynamic>))
         .where((TimeSlot s) => s.slotDate == null || s.slotDate == wanted)
+        .where((TimeSlot s) => s.sportId == null || s.sportId == sportId)
         .toList();
     slots.sort((TimeSlot a, TimeSlot b) => a.startTime.compareTo(b.startTime));
     return slots;
@@ -198,8 +215,6 @@ class ApiVenueService implements VenueService {
   @override
   Future<ApiResponse<List<Venue>>> favorites() {
     return _client.get<List<Venue>>(
-      // Confirmed by the backend: the list lives at /favorites, not under
-      // /venues. Adding and removing still go through the venue.
       '/favorites',
       authenticated: true,
       parseData: _parseVenueList,
@@ -208,26 +223,30 @@ class ApiVenueService implements VenueService {
 
   @override
   Future<ApiResponse<Venue>> toggleFavorite(
-    int venueId, {
-    required bool isFavorite,
-  }) {
+      int venueId, {
+        required bool isFavorite,
+      }) {
     return _client.post<Venue>(
       '/venues/$venueId/favorite',
-      body: <String, dynamic>{'is_favorite': isFavorite},
+      body: <String, dynamic>{
+        'is_favorite': isFavorite,
+      },
       authenticated: true,
-      parseData: (dynamic data) => Venue.fromJson(data as Map<String, dynamic>),
+      parseData: (dynamic data) =>
+          Venue.fromJson(data as Map<String, dynamic>),
     );
   }
 
-  /// Accepts both a bare array and a paginated `{ "data": [...] }` body,
-  /// because Laravel resources return one or the other depending on whether
-  /// the endpoint paginates.
+  /// Accepts both a bare array and a paginated { "data": [...] } response.
   static List<Venue> _parseVenueList(dynamic data) {
     final List<dynamic> items = data is Map<String, dynamic>
         ? (data['data'] as List<dynamic>? ?? <dynamic>[])
         : (data as List<dynamic>);
+
     return items
-        .map((dynamic item) => Venue.fromJson(item as Map<String, dynamic>))
+        .map(
+          (dynamic item) => Venue.fromJson(item as Map<String, dynamic>),
+    )
         .toList();
   }
 }

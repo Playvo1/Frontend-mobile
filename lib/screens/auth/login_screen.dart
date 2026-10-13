@@ -22,17 +22,6 @@ import '../../widgets/or_divider.dart';
 import '../../widgets/primary_button.dart';
 
 /// Email + password sign-in, plus the Google entry point.
-///
-/// The screen has three states from the design: the plain form, a rejected
-/// attempt (red fields, message, attempts left), and a locked account
-/// (everything disabled, counting down to when the lock lifts).
-///
-/// Which state applies is the server's decision, taken from
-/// USER.failed_login_attempts and USER.locked_until (Guidelines 2.4). This
-/// screen only renders what the response says; it never counts attempts
-/// itself, because a local counter resets with the app and would lie to the
-/// player. The countdown ticks locally, but it is anchored to the
-/// `locked_until` timestamp, so it cannot be cheated by a restart either.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.authService});
 
@@ -52,25 +41,16 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
 
-  /// The sentence the server returned, or a connectivity message.
   String? _errorMessage;
-
-  /// How many tries are left, as reported by the server.
   int? _remainingAttempts;
-
-  /// When the lock lifts. Null means the account is not locked.
   DateTime? _lockedUntil;
   Duration _lockRemaining = Duration.zero;
   Timer? _lockTimer;
-
-  /// True only when the server rejected the credentials, so a connectivity
-  /// message does not paint the password field red.
   bool _credentialsRejected = false;
 
   bool get _isLocked =>
       _lockedUntil != null && _lockRemaining > Duration.zero;
 
-  /// True whenever the form should be greyed out: mid-request, or locked.
   bool get _isInputDisabled => _isSubmitting || _isLocked;
 
   @override
@@ -99,24 +79,25 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
 
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
+
       if (response.success) {
         await AppRouter.toHomeAndClearStack(context);
         return;
       }
+
       _applyFailure(response);
     } on ApiException catch (exception) {
-      if (!mounted) {
-        return;
-      }
-      setState(
-        () => _errorMessage = FailureMessages.of(exception, context.l10n),
-      );
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = FailureMessages.of(exception, context.l10n);
+      });
     } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
   }
@@ -125,16 +106,16 @@ class _LoginScreenState extends State<LoginScreen> {
     final LoginFailure failure = LoginFailure.fromResponse(response);
     final AppLocalizations l10n = context.l10n;
 
-    // The server localizes `message` via the Accept-Language header we send;
-    // the l10n strings are the fallback if it comes back empty.
     if (failure.isLocked) {
       _passwordController.clear();
+
       setState(() {
         _errorMessage =
             response.message.isEmpty ? l10n.accountLocked : response.message;
         _remainingAttempts = null;
         _credentialsRejected = false;
       });
+
       _startLockCountdown(failure.lockedUntil!);
       return;
     }
@@ -150,31 +131,43 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _startLockCountdown(DateTime lockedUntil) {
     _lockTimer?.cancel();
+
     setState(() {
       _lockedUntil = lockedUntil;
       _lockRemaining = lockedUntil.difference(DateTime.now());
     });
 
     _lockTimer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
       final Duration left = lockedUntil.difference(DateTime.now());
+
       if (left <= Duration.zero) {
         timer.cancel();
+
         setState(() {
           _lockedUntil = null;
           _lockRemaining = Duration.zero;
           _errorMessage = null;
         });
+
         return;
       }
-      setState(() => _lockRemaining = left);
+
+      setState(() {
+        _lockRemaining = left;
+      });
     });
   }
 
-  /// mm:ss, the format the design shows.
   String get _formattedLockRemaining {
     final int totalSeconds = _lockRemaining.inSeconds;
     final String minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
     final String seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+
     return '$minutes:$seconds';
   }
 
@@ -182,72 +175,92 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_isLocked) {
       return l10n.tryAgainIn(_formattedLockRemaining);
     }
+
     final int? attempts = _remainingAttempts;
     return attempts == null ? null : l10n.attemptsRemaining(attempts);
   }
 
-Future<void> _handleGoogleLogin() async {
-  setState(() {
-    _isSubmitting = true;
-    _errorMessage = null;
-  });
+  Future<void> _handleGoogleLogin() async {
+    if (_isSubmitting) return;
 
-  try {
-    final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = null;
+    });
 
-    await googleSignIn.initialize();
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn.instance;
 
-    final GoogleSignInAccount account =
-        await googleSignIn.authenticate();
+      await googleSignIn.initialize(
+        serverClientId:
+            '113331187985-ii0hnr2ehc27ukr9lddjsdactolcdthd.apps.googleusercontent.com',
+      );
 
-    final GoogleSignInAuthentication authentication =
-        account.authentication;
+      final GoogleSignInAccount account =
+          await googleSignIn.authenticate();
 
-    final String? idToken = authentication.idToken;
+      final GoogleSignInAuthentication authentication =
+          account.authentication;
 
-    if (idToken == null || idToken.isEmpty) {
+      final String? idToken = authentication.idToken;
+
+      if (idToken == null || idToken.isEmpty) {
+        if (!mounted) return;
+
+        setState(() {
+          _errorMessage = 'Could not get Google ID token.';
+        });
+
+        return;
+      }
+
+      final ApiResponse<AuthSession> response =
+          await _authService.loginWithGoogle(
+     idToken,
+     mode: 'login',
+    );
+
+      if (!mounted) return;
+
+      if (response.success) {
+        await AppRouter.toHomeAndClearStack(context);
+        return;
+      }
+
+      setState(() {
+        _errorMessage = response.message;
+      });
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return;
+      }
+
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'Could not get Google ID token.';
+        _errorMessage = e.toString();
       });
-      return;
-    }
+    } on ApiException catch (exception) {
+      if (!mounted) return;
 
-    final ApiResponse<AuthSession> response =
-        await _authService.loginWithGoogle(idToken);
-
-    if (!mounted) return;
-
-    if (response.success) {
-      await AppRouter.toHomeAndClearStack(context);
-      return;
-    }
-
-    setState(() {
-      _errorMessage = response.message;
-    });
-  } on ApiException catch (exception) {
-    if (!mounted) return;
-
-    setState(() {
-      _errorMessage =
-          FailureMessages.of(exception, context.l10n);
-    });
-  } catch (e) {
-    if (!mounted) return;
-
-    setState(() {
-      _errorMessage = e.toString();
-    });
-  } finally {
-    if (mounted) {
       setState(() {
-        _isSubmitting = false;
+        _errorMessage =
+            FailureMessages.of(exception, context.l10n);
       });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -274,8 +287,6 @@ Future<void> _handleGoogleLogin() async {
           hint: l10n.passwordHint,
           controller: _passwordController,
           enabled: !_isInputDisabled,
-          // Only the password is tinted red on a rejected attempt: we must
-          // not hint that the email itself was wrong.
           hasError: showFieldError,
           obscureText: _obscurePassword,
           textInputAction: TextInputAction.done,
@@ -286,14 +297,14 @@ Future<void> _handleGoogleLogin() async {
             isObscured: _obscurePassword,
             onPressed: _isInputDisabled
                 ? null
-                : () => setState(() => _obscurePassword = !_obscurePassword),
+                : () => setState(
+                      () => _obscurePassword = !_obscurePassword,
+                    ),
           ),
           validator: (String? value) =>
               Validators.requiredPassword(value, l10n),
         ),
         const SizedBox(height: AppSpacing.sm),
-        // The design puts this link on the left, which in Arabic is the
-        // END of the line, not the start.
         Align(
           alignment: AlignmentDirectional.centerEnd,
           child: TextButton(
@@ -301,21 +312,24 @@ Future<void> _handleGoogleLogin() async {
             child: Text(l10n.forgotPassword),
           ),
         ),
-        ErrorBanner(message: _errorMessage, detail: _errorDetail(l10n)),
+        ErrorBanner(
+          message: _errorMessage,
+          detail: _errorDetail(l10n),
+        ),
         const SizedBox(height: AppSpacing.lg),
         PrimaryButton(
           label: l10n.loginButton,
           isLoading: _isSubmitting,
-          onPressed: _isLocked ? null : _handleLogin,
+          onPressed: _isLocked || _isSubmitting ? null : _handleLogin,
         ),
         const SizedBox(height: AppSpacing.lg),
         OrDivider(label: l10n.orLabel),
         const SizedBox(height: AppSpacing.xxl),
-      GoogleButton(
-     label: l10n.continueWithGoogle,
-  isLoading: _isSubmitting,
-  onPressed: _handleGoogleLogin,
-),
+        GoogleButton(
+          label: l10n.continueWithGoogle,
+          isLoading: _isSubmitting,
+          onPressed: _isSubmitting ? null : _handleGoogleLogin,
+        ),
         const SizedBox(height: AppSpacing.xl),
         AuthFooterLink(
           leadingText: l10n.noAccount,

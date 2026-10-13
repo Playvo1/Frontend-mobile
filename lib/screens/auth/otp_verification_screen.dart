@@ -14,9 +14,12 @@ import '../../widgets/otp_box_input.dart';
 import '../../widgets/primary_button.dart';
 import '../../widgets/resend_countdown.dart';
 
- enum OtpPurpose { signupVerification, passwordReset }
+enum OtpPurpose {
+  signupVerification,
+  passwordReset,
+}
 
- class OtpVerificationScreen extends StatefulWidget {
+class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({
     super.key,
     required this.purpose,
@@ -49,7 +52,9 @@ class _OtpVerificationScreenState
     final AppLocalizations l10n = context.l10n;
 
     if (_code.length < AppConfig.verificationCodeLength) {
-      setState(() => _errorMessage = l10n.otpIncomplete);
+      setState(() {
+        _errorMessage = l10n.otpIncomplete;
+      });
       return;
     }
 
@@ -83,22 +88,23 @@ class _OtpVerificationScreenState
         return;
       }
 
-      setState(
-        () => _errorMessage =
-            response.errorFor('code') ?? response.message,
-      );
+      setState(() {
+        _errorMessage =
+            response.errorFor('code') ?? response.message;
+      });
     } on ApiException catch (exception) {
       if (!mounted) {
         return;
       }
 
-      setState(
-        () => _errorMessage =
-            FailureMessages.of(exception, l10n),
-      );
+      setState(() {
+        _errorMessage = FailureMessages.of(exception, l10n);
+      });
     } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
   }
@@ -124,54 +130,57 @@ class _OtpVerificationScreenState
         await AppRouter.toResetPassword(
           context,
           email: widget.email,
+          code: _code,
         );
         return;
       }
 
-      setState(
-        () => _errorMessage =
-            response.errorFor('otp_code') ?? response.message,
-      );
+      setState(() {
+        _errorMessage =
+            response.errorFor('otp_code') ?? response.message;
+      });
     } on ApiException catch (exception) {
       if (!mounted) {
         return;
       }
 
-      setState(
-        () => _errorMessage =
-            FailureMessages.of(exception, l10n),
-      );
+      setState(() {
+        _errorMessage = FailureMessages.of(exception, l10n);
+      });
     } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() {
+          _isSubmitting = false;
+        });
       }
     }
   }
 
   Future<void> _handleResend() async {
-  final AppLocalizations l10n = context.l10n;
+    final AppLocalizations l10n = context.l10n;
 
-  try {
-    if (_isSignup) {
-      await _authService.sendOtp(widget.email);
-    } else {
-      await _authService.forgotPassword(widget.email);
-    }
+    try {
+      if (_isSignup) {
+        await _authService.sendOtp(widget.email);
+      } else {
+        await _authService.forgotPassword(widget.email);
+      }
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.codeResent)),
-      );
-    }
-  } on ApiException catch (exception) {
-    if (mounted) {
-      setState(
-        () => _errorMessage =
-            FailureMessages.of(exception, l10n),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.codeResent),
+          ),
+        );
+      }
+    } on ApiException catch (exception) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = FailureMessages.of(exception, l10n);
+        });
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -181,12 +190,11 @@ class _OtpVerificationScreenState
       title: l10n.otpTitle,
       subtitle: l10n.otpSubtitle(widget.email),
       children: <Widget>[
-       OtpBoxInput(
-     onChanged: (String code) {
-    _code = code.trim();
-      print('OTP LENGTH: ${_code.length}');
-    },
-),
+        OtpBoxInput(
+          onChanged: (String code) {
+            _code = code.trim();
+          },
+        ),
         ErrorBanner(message: _errorMessage),
         const SizedBox(height: AppSpacing.md),
         Center(
@@ -205,4 +213,4 @@ class _OtpVerificationScreenState
       ],
     );
   }
-} 
+}

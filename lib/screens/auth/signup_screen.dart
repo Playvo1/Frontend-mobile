@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/api_exception.dart';
 import '../../core/app_config.dart';
 import '../../core/country_codes.dart';
@@ -20,7 +20,7 @@ import '../../widgets/google_button.dart';
 import '../../widgets/or_divider.dart';
 import '../../widgets/primary_button.dart';
 import 'otp_verification_screen.dart';
-
+import '../../models/auth_session.dart';
 /// Player registration. On success the backend has already sent a
 /// VERIFICATION_CODE, so the next stop is the OTP screen (Guidelines 7.2).
 class SignupScreen extends StatefulWidget {
@@ -123,9 +123,88 @@ class _SignupScreenState extends State<SignupScreen> {
     }
   }
 
-  Future<void> _handleGoogleSignup() async {
-    // TODO(auth): same google_sign_in flow as the login screen.
+
+Future<void> _handleGoogleSignup() async {
+  if (_isSubmitting) return;
+
+  setState(() {
+    _isSubmitting = true;
+    _errorMessage = null;
+  });
+
+  try {
+    final GoogleSignIn googleSignIn = GoogleSignIn.instance;
+
+    await googleSignIn.initialize(
+      serverClientId:
+          '113331187985-ii0hnr2ehc27ukr9lddjsdactolcdthd.apps.googleusercontent.com',
+    );
+
+    final GoogleSignInAccount account =
+        await googleSignIn.authenticate();
+
+    final GoogleSignInAuthentication authentication =
+        account.authentication;
+
+    final String? idToken = authentication.idToken;
+
+    if (idToken == null || idToken.isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = 'Could not get Google ID token.';
+      });
+      return;
+    }
+
+    final ApiResponse<AuthSession> response =
+        await _authService.loginWithGoogle(
+      idToken,
+      mode: 'register',
+     );
+
+    if (!mounted) return;
+
+    if (response.success) {
+      await AppRouter.toHomeAndClearStack(context);
+      return;
+    }
+
+    setState(() {
+      _errorMessage = response.message;
+    });
+      } on GoogleSignInException catch (e) {
+    if (e.code == GoogleSignInExceptionCode.canceled) {
+      return;
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _errorMessage = e.toString();
+    });
+  } on ApiException catch (exception) {
+    if (!mounted) return;
+
+    setState(() {
+      _errorMessage =
+          FailureMessages.of(exception, context.l10n);
+    });
+  } catch (e) {
+    if (!mounted) return;
+
+    setState(() {
+      _errorMessage = e.toString();
+    });
+  } finally {
+    if (mounted) {
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {
