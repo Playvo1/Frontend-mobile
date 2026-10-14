@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../core/api_client.dart';
 import '../core/api_response.dart';
 import '../core/app_config.dart';
@@ -66,7 +68,7 @@ class ApiBookingService implements BookingService {
     String? sportType,
   }) async {
     final ApiResponse<List<Booking>> response =
-        await _client.get<List<Booking>>(
+    await _client.get<List<Booking>>(
       '/bookings',
       authenticated: true,
       query: <String, String>{
@@ -90,24 +92,61 @@ class ApiBookingService implements BookingService {
     );
   }
 
-  /// Accepts the three envelopes the backend uses for a list: a bare
-  /// array, Laravel's `{data: [...]}`, and the owner endpoint's
-  /// `{bookings: {data: [...]}}`.
+  /// Finds the rows wherever this deployment put them.
+  ///
+  /// A list has arrived under four shapes so far — a bare array,
+  /// `{data: [...]}`, a paginated `{data: {data: [...]}}`, and the owner
+  /// endpoint's `{bookings: {data: [...]}}` — so rather than assume one,
+  /// the first list under a known key wins.
   static List<Booking> _parseBookingList(dynamic data) {
-    List<dynamic> items;
-    if (data is List) {
-      items = data;
-    } else if (data is Map<String, dynamic>) {
-      final dynamic nested = data['bookings'];
-      final Map<String, dynamic> page =
-          nested is Map<String, dynamic> ? nested : data;
-      items = page['data'] as List<dynamic>? ?? <dynamic>[];
-    } else {
-      items = <dynamic>[];
+    final List<dynamic>? items = _findList(data);
+
+    if (items == null) {
+      // An unrecognised shape must not read as "you have no bookings".
+      // The console names what actually arrived, so the fix is one line
+      // in [_listKeys] rather than an afternoon of guessing.
+      debugPrint(
+        'Bookings: no list found in the response. Received '
+            '${data is Map<String, dynamic> ? 'keys ${data.keys.toList()}' : data.runtimeType}',
+      );
+      return <Booking>[];
     }
+
+    if (items.isEmpty) {
+      // The shape was understood and the server really did send nothing,
+      // which is a different problem from the one above and says so.
+      debugPrint('Bookings: the server returned an empty list.');
+    }
+
     return items
         .map((dynamic b) => Booking.fromJson(b as Map<String, dynamic>))
         .toList();
+  }
+
+  /// The keys a list has been nested under, in the order they are tried.
+  static const List<String> _listKeys = <String>[
+    'data',
+    'bookings',
+    'items',
+    'results',
+  ];
+
+  static List<dynamic>? _findList(dynamic node, [int depth = 0]) {
+    if (node is List) {
+      return node;
+    }
+    // Three levels covers `{data: {bookings: {data: [...]}}}`; deeper than
+    // that is a shape worth questioning rather than guessing at.
+    if (node is! Map<String, dynamic> || depth >= 3) {
+      return null;
+    }
+    for (final String key in _listKeys) {
+      final List<dynamic>? found = _findList(node[key], depth + 1);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
   }
 
   /// A booking nests its slot but never its venue, so "حجوزاتي" would show
@@ -141,7 +180,7 @@ class ApiBookingService implements BookingService {
     try {
       for (int page = 1; page <= maxPages; page++) {
         final ApiResponse<List<Venue>> response =
-            await _client.get<List<Venue>>(
+        await _client.get<List<Venue>>(
           '/venues',
           query: <String, String>{'page': '$page'},
           parseData: (dynamic data) {

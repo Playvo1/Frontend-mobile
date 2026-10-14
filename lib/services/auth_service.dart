@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 
 import '../core/api_client.dart';
+import '../core/api_exception.dart';
 import '../core/api_response.dart';
 import '../core/push_notifications.dart';
 import '../core/token_storage.dart';
@@ -34,37 +37,36 @@ class AuthService {
         'email': email,
         'password': password,
         'password_confirmation': password,
-
-        
         if (phone != null && phone.isNotEmpty) 'phone': phone,
       },
       parseData: (dynamic data) =>
           RegistrationResult.fromJson(data as Map<String, dynamic>),
     );
   }
-  /// POST /auth/send-otp
-   Future<ApiResponse<void>> sendOtp(String email) {
-  return _client.post<void>(
-    '/auth/send-otp',
-    body: <String, dynamic>{
-      'email': email,
-    },
-  );
-}
 
-  /// POST /auth/verify — confirms the emailed code.
- Future<ApiResponse<void>> verifyEmail({
-  required String email,
-  required String code,
-}) {
-  return _client.post<void>(
-    '/auth/verify-otp',
-    body: <String, dynamic>{
-      'email': email,
-      'otp_code': code,
-    },
-  );
-}
+  /// POST /auth/send-otp
+  Future<ApiResponse<void>> sendOtp(String email) {
+    return _client.post<void>(
+      '/auth/send-otp',
+      body: <String, dynamic>{
+        'email': email,
+      },
+    );
+  }
+
+  /// POST /auth/verify-otp — confirms the emailed code.
+  Future<ApiResponse<void>> verifyEmail({
+    required String email,
+    required String code,
+  }) {
+    return _client.post<void>(
+      '/auth/verify-otp',
+      body: <String, dynamic>{
+        'email': email,
+        'otp_code': code,
+      },
+    );
+  }
 
   /// POST /auth/login — on success the token is stored before returning, so
   /// callers never handle the credential themselves.
@@ -72,8 +74,7 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final ApiResponse<AuthSession> response =
-        await _client.post<AuthSession>(
+    final ApiResponse<AuthSession> response = await _client.post<AuthSession>(
       '/auth/login',
       body: <String, dynamic>{'email': email, 'password': password},
       parseData: (dynamic data) =>
@@ -84,16 +85,12 @@ class AuthService {
     return response;
   }
 
-  /// POST /auth/login/google — logs in or auto-registers from a Google
-  /// ID token.
-
   /// POST /auth/google — registers or logs in based on the mode.
   Future<ApiResponse<AuthSession>> loginWithGoogle(
-    String idToken, {
-    required String mode,
-  }) async {
-    final ApiResponse<AuthSession> response =
-        await _client.post<AuthSession>(
+      String idToken, {
+        required String mode,
+      }) async {
+    final ApiResponse<AuthSession> response = await _client.post<AuthSession>(
       '/auth/google',
       body: <String, dynamic>{
         'id_token': idToken,
@@ -107,7 +104,6 @@ class AuthService {
     return response;
   }
 
-
   /// POST /auth/forgot-password — the response is identical whether or not
   /// the email exists, so the app must not branch on it.
   Future<ApiResponse<void>> forgotPassword(String email) {
@@ -117,53 +113,99 @@ class AuthService {
     );
   }
 
+  /// POST /auth/verify-reset-otp
+  Future<ApiResponse<void>> verifyResetOtp({
+    required String email,
+    required String code,
+  }) {
+    return _client.post<void>(
+      '/auth/verify-reset-otp',
+      body: <String, dynamic>{
+        'email': email,
+        'otp_code': code,
+      },
+    );
+  }
+
   /// POST /auth/reset-password — needs the email and the code the player
   /// entered on the OTP screen, which is why both are carried forward
   /// through the flow rather than re-asked.
- /// POST /auth/verify-reset-otp
-Future<ApiResponse<void>> verifyResetOtp({
-  required String email,
-  required String code,
-}) {
-  return _client.post<void>(
-    '/auth/verify-reset-otp',
-    body: <String, dynamic>{
-      'email': email,
-      'otp_code': code,
-    },
-  );
-}
-
-/// POST /auth/reset-password
-Future<ApiResponse<void>> resetPassword({
-  required String email,
-  required String code,
-  required String password,
-}) {
-  return _client.post<void>(
-    '/auth/reset-password',
-    body: <String, dynamic>{
-      'email': email,
-      'code': code,
-      'password': password,
-      'password_confirmation': password,
-    },
-  );
-}
-
-  /// GET /auth/me — used on launch to decide whether a stored token is
-  /// still valid.
-  ///
-  /// TODO(api): not in the Postman collection. If the route does not
-  /// exist, the call returns 404 and the app treats the stored token as
-  /// expired, so the player is signed out on every launch. Ask the backend
-  /// for the session-check route and change the path here only.
-  Future<ApiResponse<User>> me() {
-    return _client.get<User>(
-      '/auth/me',
-      authenticated: true,
-      parseData: (dynamic data) => User.fromJson(data as Map<String, dynamic>),
+  Future<ApiResponse<void>> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+  }) {
+    return _client.post<void>(
+      '/auth/reset-password',
+      body: <String, dynamic>{
+        'email': email,
+        'code': code,
+        'password': password,
+        'password_confirmation': password,
+      },
     );
+  }
+
+  /// The signed-in account.
+  ///
+  /// `GET /auth/me` is asked first and its answer is cached. That route is
+  /// not in the Postman collection, so on a deployment without it the call
+  /// comes back 404 — and the account screen would show an empty name and
+  /// email. Login already returns the whole account, so the copy saved then
+  /// answers instead and the profile renders either way.
+  ///
+  /// TODO(api): confirm the session-check route with the backend. Until it
+  /// exists the cached copy cannot notice a token the server has revoked.
+  Future<ApiResponse<User>> me() async {
+    try {
+      final ApiResponse<User> response = await _client.get<User>(
+        '/auth/me',
+        authenticated: true,
+        parseData: (dynamic data) => User.fromJson(_userObject(data)),
+      );
+      final User? fresh = response.data;
+      if (response.success && fresh != null) {
+        await _cacheUser(fresh);
+        return response;
+      }
+    } on ApiException {
+      // Route missing or unreachable; the cached account answers below.
+    }
+
+    final User? cached = await _readCachedUser();
+    if (cached != null) {
+      return ApiResponse<User>(success: true, message: '', data: cached);
+    }
+    return const ApiResponse<User>(success: false, message: '');
+  }
+
+  /// Accepts the account either as the `data` object itself or nested under
+  /// `data.user`, which is how login returns it.
+  static Map<String, dynamic> _userObject(dynamic data) {
+    final Map<String, dynamic> map = data as Map<String, dynamic>;
+    final dynamic nested = map['user'];
+    return nested is Map<String, dynamic> ? nested : map;
+  }
+
+  Future<void> _cacheUser(User user) async {
+    try {
+      await _tokenStorage.writeProfile(jsonEncode(user.toJson()));
+    } on Object catch (error) {
+      debugPrint('Profile cache skipped: $error');
+    }
+  }
+
+  Future<User?> _readCachedUser() async {
+    try {
+      final String? raw = await _tokenStorage.readProfile();
+      if (raw == null || raw.isEmpty) {
+        return null;
+      }
+      return User.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } on Object catch (error) {
+      debugPrint('Cached profile unreadable: $error');
+      return null;
+    }
   }
 
   /// POST /auth/logout — revokes the token server-side, then clears it
@@ -180,6 +222,8 @@ Future<ApiResponse<void>> resetPassword({
       }
       return await _client.post<void>('/auth/logout', authenticated: true);
     } finally {
+      // Clears the token AND the cached profile, so signing out leaves no
+      // name or email behind on the device.
       await _tokenStorage.clear();
     }
   }
@@ -190,6 +234,10 @@ Future<ApiResponse<void>> resetPassword({
     final AuthSession? session = response.data;
     if (response.success && session != null) {
       await _tokenStorage.write(session.token);
+      // Login is the one call that reliably returns the account, so the
+      // profile screen is fed from here rather than from a route that may
+      // not exist on this deployment.
+      await _cacheUser(session.user);
       // The device token is only useful once it can be tied to an account,
       // so it is registered here rather than on launch. Push is a
       // side-effect of signing in, never a condition for it, so a failure
