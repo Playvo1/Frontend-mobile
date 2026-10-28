@@ -26,7 +26,14 @@ class Venue {
     this.amenities = const <Amenity>[],
     this.latitude,
     this.longitude,
+    this.cityAliases = const <String>[],
   });
+
+  /// Every spelling the backend has for this venue's city — "غزة" and
+  /// "Gaza" both. [city] holds only the one for the current language, so a
+  /// filter picked in Arabic would miss a venue read in English without
+  /// this.
+  final List<String> cityAliases;
 
   final int id;
   final String name;
@@ -93,6 +100,7 @@ class Venue {
       amenities: amenities,
       latitude: latitude,
       longitude: longitude,
+      cityAliases: cityAliases,
     );
   }
 
@@ -114,6 +122,9 @@ class Venue {
         'amenities': amenities.map((Amenity a) => a.toJson()).toList(),
         'latitude': latitude,
         'longitude': longitude,
+        // Its own key rather than a nested `city` object, which would
+        // collide with the plain `city` string above.
+        'city_aliases': cityAliases,
       };
 
   /// Reads the shape the backend actually returns, confirmed against a
@@ -147,7 +158,31 @@ class Venue {
           .toList(),
       latitude: _toNullableDouble(json['latitude']),
       longitude: _toNullableDouble(json['longitude']),
+      // From the server it is the nested city object; from the offline
+      // cache it is the flat list written by [toJson].
+      cityAliases: (json['city_aliases'] as List<dynamic>?)
+              ?.map((dynamic n) => n.toString())
+              .toList() ??
+          _cityAliases(json['city']),
     );
+  }
+
+  /// Both `name_ar` and `name_en` off the nested city object.
+  static List<String> _cityAliases(dynamic raw) {
+    if (raw is String) {
+      return <String>[raw.trim()];
+    }
+    if (raw is! Map<String, dynamic>) {
+      return const <String>[];
+    }
+    final List<String> names = <String>[];
+    for (final String key in const <String>['name_ar', 'name_en', 'name']) {
+      final String value = (raw[key] as String? ?? '').trim();
+      if (value.isNotEmpty && !names.contains(value)) {
+        names.add(value);
+      }
+    }
+    return names;
   }
 
   /// Picks `<field>_ar` or `<field>_en` by the active language, falling

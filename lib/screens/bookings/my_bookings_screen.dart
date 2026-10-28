@@ -14,6 +14,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/booking_list_card.dart';
+import '../../widgets/diagnostics_panel.dart';
 import '../../widgets/empty_state.dart';
 import '../../widgets/error_banner.dart';
 import '../../widgets/infinite_scroll.dart';
@@ -309,6 +310,9 @@ class _MyBookingsScreenState extends State<MyBookingsScreen> {
               ),
             ),
             Expanded(child: _buildBody(l10n)),
+            // Debug builds only: shows what `/bookings` actually answered,
+            // so a missing reservation can be reported with a screenshot.
+            const DiagnosticsPanel(),
           ],
         ),
       ),

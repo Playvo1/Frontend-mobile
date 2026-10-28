@@ -47,7 +47,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   late final BookingService _bookingService =
       widget.bookingService ?? BookingService.create();
 
-  String? _role;
   bool _isSubmitting = false;
   String? _errorMessage;
 
@@ -72,7 +71,10 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       final ApiResponse<Booking> response = await _bookingService.createBooking(
         timeSlotId: widget.slot.id,
         captainName: _nameController.text.trim(),
-        captainRole: _role!,
+        // The form no longer asks: whoever makes the booking is its
+        // captain. The field stays in the request because the endpoint
+        // validates it as required.
+        captainRole: CaptainRole.captain,
         captainPhone: _phoneController.text.trim(),
       );
 
@@ -133,16 +135,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     }
   }
 
-  String _roleLabel(String role, AppLocalizations l10n) {
-    switch (role) {
-      case CaptainRole.captain:
-        return l10n.roleCaptain;
-      case CaptainRole.player:
-        return l10n.rolePlayer;
-      default:
-        return l10n.roleOrganizer;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -210,35 +202,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   ),
                 ),
                 validator: (String? value) => Validators.fullName(value, l10n),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _FieldLabel(label: l10n.roleLabel),
-              DropdownButtonFormField<String>(
-                initialValue: _role,
-                isExpanded: true,
-                hint: Text(l10n.rolePlaceholder, style: textTheme.bodySmall),
-                icon: const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: AppColors.navy300,
-                ),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(
-                    Icons.groups_outlined,
-                    size: 19,
-                    color: AppColors.navy300,
-                  ),
-                ),
-                items: CaptainRole.all
-                    .map(
-                      (String role) => DropdownMenuItem<String>(
-                        value: role,
-                        child: Text(_roleLabel(role, l10n)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (String? role) => setState(() => _role = role),
-                validator: (String? value) =>
-                    value == null ? l10n.roleRequired : null,
               ),
               const SizedBox(height: AppSpacing.md),
               _FieldLabel(label: l10n.phoneLabel),

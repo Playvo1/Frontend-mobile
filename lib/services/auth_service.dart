@@ -146,30 +146,30 @@ class AuthService {
     );
   }
 
-  /// The signed-in account.
+  /// The signed-in account, from the server when it can be reached.
   ///
-  /// `GET /auth/me` is asked first and its answer is cached. That route is
-  /// not in the Postman collection, so on a deployment without it the call
-  /// comes back 404 — and the account screen would show an empty name and
-  /// email. Login already returns the whole account, so the copy saved then
-  /// answers instead and the profile renders either way.
-  ///
-  /// TODO(api): confirm the session-check route with the backend. Until it
-  /// exists the cached copy cannot notice a token the server has revoked.
+  /// `GET /player/profile` is the real route and is asked first.
+  /// `GET /auth/me` is tried after it, since it is what the rest of the
+  /// app was written against and may yet exist. Whatever answers is
+  /// cached, so a later launch without a network still has a name and an
+  /// email to show — login returns the account too, and that copy is
+  /// saved at sign-in.
   Future<ApiResponse<User>> me() async {
-    try {
-      final ApiResponse<User> response = await _client.get<User>(
-        '/auth/me',
-        authenticated: true,
-        parseData: (dynamic data) => User.fromJson(_userObject(data)),
-      );
-      final User? fresh = response.data;
-      if (response.success && fresh != null) {
-        await _cacheUser(fresh);
-        return response;
+    for (final String path in const <String>['/player/profile', '/auth/me']) {
+      try {
+        final ApiResponse<User> response = await _client.get<User>(
+          path,
+          authenticated: true,
+          parseData: (dynamic data) => User.fromJson(_userObject(data)),
+        );
+        final User? fresh = response.data;
+        if (response.success && fresh != null) {
+          await _cacheUser(fresh);
+          return response;
+        }
+      } on ApiException {
+        // Unreachable or missing; the next path, then the cache, answers.
       }
-    } on ApiException {
-      // Route missing or unreachable; the cached account answers below.
     }
 
     final User? cached = await _readCachedUser();
@@ -179,12 +179,19 @@ class AuthService {
     return const ApiResponse<User>(success: false, message: '');
   }
 
-  /// Accepts the account either as the `data` object itself or nested under
-  /// `data.user`, which is how login returns it.
+  /// Accepts the account as the `data` object itself or nested under
+  /// `user`, `profile` or `player` — each endpoint wraps it differently.
   static Map<String, dynamic> _userObject(dynamic data) {
-    final Map<String, dynamic> map = data as Map<String, dynamic>;
-    final dynamic nested = map['user'];
-    return nested is Map<String, dynamic> ? nested : map;
+    if (data is! Map<String, dynamic>) {
+      return <String, dynamic>{};
+    }
+    for (final String key in const <String>['user', 'profile', 'player']) {
+      final dynamic nested = data[key];
+      if (nested is Map<String, dynamic>) {
+        return nested;
+      }
+    }
+    return data;
   }
 
   Future<void> _cacheUser(User user) async {

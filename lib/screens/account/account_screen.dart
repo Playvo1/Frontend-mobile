@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_exception.dart';
 import '../../core/app_router.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/diagnostics_panel.dart';
 import '../../widgets/language_sheet.dart';
 import '../../l10n/l10n.dart';
 import '../../models/user.dart';
@@ -52,6 +53,15 @@ class _AccountScreenState extends State<AccountScreen> {
     }
   }
 
+  /// Adopts whatever the edit screen saved, so the card shows the server's
+  /// version the moment the player comes back.
+  Future<void> _openEditProfile() async {
+    await AppRouter.toEditProfile(context, _user);
+    if (mounted) {
+      await _load();
+    }
+  }
+
   Future<void> _logOut() async {
     final AppLocalizations l10n = context.l10n;
     final bool confirmed = await ConfirmDialog.show(
@@ -97,12 +107,14 @@ class _AccountScreenState extends State<AccountScreen> {
                   const SizedBox(height: AppSpacing.lg),
                   _ProfileCard(
                     user: _user,
-                    onEdit: () => AppRouter.toEditProfile(context, _user),
+                    onEdit: _openEditProfile,
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   _SectionHeader(icon: Icons.settings_outlined, title: l10n.settings),
                   const SizedBox(height: AppSpacing.md),
                   _SettingsList(onLogOut: _logOut),
+                  // Debug builds only: shows what /player/profile answered.
+                  const DiagnosticsPanel(),
                   const SizedBox(height: AppSpacing.lg),
                 ],
               ),
@@ -136,7 +148,7 @@ class _ProfileCard extends StatelessWidget {
           // with the name and contact details to its left.
           Row(
             children: <Widget>[
-              const _Avatar(size: 64),
+              _Avatar(size: 64, photoUrl: user?.photoUrl),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
@@ -215,10 +227,11 @@ class _ContactLine extends StatelessWidget {
 
 /// The circular avatar with its camera badge.
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.size, this.onTapCamera});
+  const _Avatar({required this.size, this.onTapCamera, this.photoUrl});
 
   final double size;
   final VoidCallback? onTapCamera;
+  final String? photoUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -230,15 +243,28 @@ class _Avatar extends StatelessWidget {
           Container(
             width: size,
             height: size,
+            clipBehavior: Clip.antiAlias,
             decoration: const BoxDecoration(
               color: AppColors.grey200,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.person,
-              size: size * 0.55,
-              color: AppColors.navy300,
-            ),
+            child: photoUrl == null
+                ? Icon(
+                    Icons.person,
+                    size: size * 0.55,
+                    color: AppColors.navy300,
+                  )
+                : Image.network(
+                    photoUrl!,
+                    fit: BoxFit.cover,
+                    // A broken link must not leave a grey hole where a
+                    // face should be.
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.person,
+                      size: size * 0.55,
+                      color: AppColors.navy300,
+                    ),
+                  ),
           ),
           PositionedDirectional(
             bottom: 0,

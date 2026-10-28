@@ -1,11 +1,11 @@
-import 'package:flutter/foundation.dart';
-
 import '../core/api_client.dart';
 import '../core/api_response.dart';
+import '../core/diagnostics.dart';
 import '../core/app_config.dart';
 import '../models/booking.dart';
 import '../models/venue.dart';
 import 'mock_booking_service.dart';
+import 'venue_service.dart';
 
 /// Creating a reservation and sending its payment proof
 /// (`POST /bookings` and `POST /bookings/{id}/payment-receipt`).
@@ -68,7 +68,7 @@ class ApiBookingService implements BookingService {
     String? sportType,
   }) async {
     final ApiResponse<List<Booking>> response =
-    await _client.get<List<Booking>>(
+        await _client.get<List<Booking>>(
       '/bookings',
       authenticated: true,
       query: <String, String>{
@@ -76,6 +76,12 @@ class ApiBookingService implements BookingService {
         if (sportType != null) 'sport_type': sportType,
       },
       parseData: (dynamic data) => _parseBookingList(data),
+    );
+
+    Diagnostics.add(
+      'GET /bookings p$page -> ${response.statusCode} '
+      'success=${response.success} more=${response.hasMorePages} '
+      'msg="${response.message}"',
     );
 
     final List<Booking>? bookings = response.data;
@@ -105,22 +111,26 @@ class ApiBookingService implements BookingService {
       // An unrecognised shape must not read as "you have no bookings".
       // The console names what actually arrived, so the fix is one line
       // in [_listKeys] rather than an afternoon of guessing.
-      debugPrint(
-        'Bookings: no list found in the response. Received '
-            '${data is Map<String, dynamic> ? 'keys ${data.keys.toList()}' : data.runtimeType}',
+      Diagnostics.add(
+        'bookings: NO LIST FOUND. '
+        '${data is Map<String, dynamic> ? 'keys=${data.keys.toList()}' : '${data.runtimeType}'}',
       );
       return <Booking>[];
     }
 
-    if (items.isEmpty) {
-      // The shape was understood and the server really did send nothing,
-      // which is a different problem from the one above and says so.
-      debugPrint('Bookings: the server returned an empty list.');
-    }
-
-    return items
+    final List<Booking> bookings = items
         .map((dynamic b) => Booking.fromJson(b as Map<String, dynamic>))
         .toList();
+
+    // Prints what the server actually sent, so "my booking is missing" can
+    // be settled by reading one line instead of guessing between the app,
+    // the pagination and the backend.
+    Diagnostics.add(
+      'bookings parsed: ${bookings.length} '
+      'ids=${bookings.map((Booking b) => b.id).toList()}',
+    );
+
+    return bookings;
   }
 
   /// The keys a list has been nested under, in the order they are tried.
@@ -173,33 +183,19 @@ class ApiBookingService implements BookingService {
     }).toList();
   }
 
+  /// Reuses the venue list the slot lookup already caches, so opening
+  /// "حجوزاتي" does not page the whole list again on every visit.
   Future<Map<int, Venue>> _venuesById(Set<int> wanted) async {
-    const int maxPages = 5;
     final Map<int, Venue> found = <int, Venue>{};
 
     try {
-      for (int page = 1; page <= maxPages; page++) {
-        final ApiResponse<List<Venue>> response =
-        await _client.get<List<Venue>>(
-          '/venues',
-          query: <String, String>{'page': '$page'},
-          parseData: (dynamic data) {
-            final List<dynamic> items = data is Map<String, dynamic>
-                ? (data['data'] as List<dynamic>? ?? <dynamic>[])
-                : (data as List<dynamic>);
-            return items
-                .map((dynamic v) => Venue.fromJson(v as Map<String, dynamic>))
-                .toList();
-          },
-        );
+      final List<Map<String, dynamic>>? venues =
+          await ApiVenueService().allVenuesRaw();
 
-        for (final Venue venue in response.data ?? <Venue>[]) {
-          if (wanted.contains(venue.id)) {
-            found[venue.id] = venue;
-          }
-        }
-        if (found.length == wanted.length || response.hasMorePages != true) {
-          break;
+      for (final Map<String, dynamic> raw in venues ?? <Map<String, dynamic>>[]) {
+        final Object? id = raw['id'];
+        if (id is int && wanted.contains(id)) {
+          found[id] = Venue.fromJson(raw);
         }
       }
     } on Object {
@@ -250,8 +246,8 @@ class ApiBookingService implements BookingService {
     required String captainName,
     required String captainRole,
     required String captainPhone,
-  }) {
-    return _client.post<Booking>(
+  }) async {
+    final ApiResponse<Booking> response = await _client.post<Booking>(
       '/bookings',
       authenticated: true,
       body: <String, dynamic>{
@@ -263,6 +259,22 @@ class ApiBookingService implements BookingService {
       parseData: (dynamic data) =>
           Booking.fromJson(data as Map<String, dynamic>),
     );
+
+    // The id created here is what should appear at the top of "حجوزاتي".
+    // Printing it next to the ids the list receives turns "my booking is
+    // missing" into a comparison instead of a hunt.
+    Diagnostics.add(
+      'POST /bookings -> ${response.statusCode} success=${response.success} '
+      'CREATED id=${response.data?.id} status=${response.data?.status} '
+      'msg="${response.message}"',
+    );
+
+    if (response.success) {
+      // The hour just taken must not keep showing as available to this
+      // player, so the cached venue list goes rather than ages out.
+      ApiVenueService.invalidateVenueCache();
+    }
+    return response;
   }
 
   @override

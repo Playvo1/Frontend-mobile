@@ -1,27 +1,44 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api_exception.dart';
+import '../../core/api_response.dart';
+import '../../core/failure_messages.dart';
 import '../../l10n/l10n.dart';
+import '../../models/assistant_reply.dart';
+import '../../services/assistant_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/app_illustration.dart';
+import '../../widgets/diagnostics_panel.dart';
 
 /// One line of the conversation.
 class AssistantMessage {
-  const AssistantMessage({required this.text, required this.isFromPlayer});
+  const AssistantMessage({
+    required this.text,
+    required this.isFromPlayer,
+    this.options = const <AssistantOption>[],
+  });
 
   final String text;
   final bool isFromPlayer;
+
+  /// Choices offered with this answer. Tapping one sends its id back
+  /// rather than making the player retype what the assistant just listed.
+  final List<AssistantOption> options;
 }
 
 /// "المساعد الذكي" — a chat where the player can ask about pitches and
 /// bookings, with example questions to start from.
 ///
-/// TODO(api): there is no assistant endpoint yet, so replies are not
-/// generated — sending a message only adds it to the thread. Point
-/// [_send] at the endpoint once the backend adds one.
+/// Wired to `POST /assistant/query`, which is authenticated and rate
+/// limited. A failure is answered inside the thread rather than as a
+/// banner, so the conversation still reads as a conversation.
 class AssistantScreen extends StatefulWidget {
-  const AssistantScreen({super.key});
+  const AssistantScreen({super.key, this.assistantService});
+
+  /// Injectable so the screen can be exercised without a network.
+  final AssistantService? assistantService;
 
   @override
   State<AssistantScreen> createState() => _AssistantScreenState();
@@ -32,6 +49,9 @@ class _AssistantScreenState extends State<AssistantScreen> {
   final ScrollController _scrollController = ScrollController();
 
   final List<AssistantMessage> _messages = <AssistantMessage>[];
+
+  late final AssistantService _assistantService =
+      widget.assistantService ?? AssistantService();
 
   /// Drawn as the three-dot bubble while a reply is on its way.
   bool _isAssistantTyping = false;
@@ -55,14 +75,69 @@ class _AssistantScreenState extends State<AssistantScreen> {
     });
     _scrollToEnd();
 
-    // TODO(api): there is no assistant endpoint yet. The indicator shows
-    // that a reply is expected and then clears; replace this delay with
-    // the call once the backend adds one.
-    await Future<void>.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      setState(() => _isAssistantTyping = false);
-    }
+    await _answer(() => _assistantService.ask(trimmed));
   }
+
+  /// Sends the id of a choice the assistant offered, and echoes its label
+  /// into the thread so the conversation still reads in order.
+  Future<void> _choose(AssistantOption option) async {
+    setState(() {
+      _messages.add(
+        AssistantMessage(text: option.label, isFromPlayer: true),
+      );
+      _isAssistantTyping = true;
+    });
+    _scrollToEnd();
+
+    await _answer(() => _assistantService.choose(option.id));
+  }
+
+  /// Runs [request] and puts its outcome in the thread. A question that
+  /// vanishes without a response is the one outcome this screen must not
+  /// have, so a failure becomes a message rather than nothing.
+  Future<void> _answer(
+    Future<ApiResponse<AssistantReply>> Function() request,
+  ) async {
+    final AppLocalizations l10n = context.l10n;
+    String text;
+    List<AssistantOption> options = const <AssistantOption>[];
+
+    try {
+      final ApiResponse<AssistantReply> response = await request();
+      final AssistantReply? reply = response.data;
+
+      if (response.success && reply != null && reply.hasText) {
+        text = reply.text;
+        options = reply.options;
+      } else if (response.statusCode == 429) {
+        // The route is throttled, so asking quickly is an ordinary thing
+        // to do and gets its own sentence.
+        text = l10n.assistantTooManyQuestions;
+      } else {
+        text = response.message.trim().isNotEmpty
+            ? response.message.trim()
+            : l10n.assistantUnavailable;
+      }
+    } on ApiException catch (exception) {
+      text = FailureMessages.of(exception, l10n);
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isAssistantTyping = false;
+      _messages.add(
+        AssistantMessage(
+          text: text,
+          isFromPlayer: false,
+          options: options,
+        ),
+      );
+    });
+    _scrollToEnd();
+  }
+
 
   /// Jumps to the newest message after the frame that adds it.
   void _scrollToEnd() {
@@ -181,9 +256,19 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   ..._messages.map(
                     (AssistantMessage message) => Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _Bubble(
-                        text: message.text,
-                        isFromPlayer: message.isFromPlayer,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          _Bubble(
+                            text: message.text,
+                            isFromPlayer: message.isFromPlayer,
+                          ),
+                          if (message.options.isNotEmpty)
+                            _OptionChips(
+                              options: message.options,
+                              onSelected: _choose,
+                            ),
+                        ],
                       ),
                     ),
                   ),
@@ -192,12 +277,59 @@ class _AssistantScreenState extends State<AssistantScreen> {
                 ],
               ),
             ),
+            // Debug builds only: shows what `/assistant/query` answered.
+            const DiagnosticsPanel(),
             _InputBar(
               controller: _inputController,
               onSend: () => _send(_inputController.text),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The choices an answer offered, as taps rather than retyping.
+class _OptionChips extends StatelessWidget {
+  const _OptionChips({required this.options, required this.onSelected});
+
+  final List<AssistantOption> options;
+  final ValueChanged<AssistantOption> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: options
+            .map(
+              (AssistantOption option) => InkWell(
+                onTap: () => onSelected(option),
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.orange),
+                  ),
+                  child: Text(
+                    option.label,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: AppColors.orange,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }

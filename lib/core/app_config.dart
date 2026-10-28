@@ -30,7 +30,10 @@ class AppConfig {
     return '$fileBaseUrl${path.startsWith('/') ? '' : '/'}$path';
   }
 
-  static const Duration requestTimeout = Duration(seconds: 20);
+  /// 60s rather than 20s because the deployment sleeps when idle and its
+  /// first request after waking takes the best part of a minute. At 20s
+  /// every cold start read as "the server is not responding".
+  static const Duration requestTimeout = Duration(seconds: 60);
 
   /// Uploading a receipt photo over a weak connection needs longer than a
   /// JSON call.

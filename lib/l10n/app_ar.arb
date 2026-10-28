@@ -225,6 +225,8 @@
   "assistantQ4": "ما هي أسعار الملاعب؟",
   "assistantQ5": "ما هي مواعيد العمل؟",
   "assistantQ6": "كيف يمكنني إلغاء الحجز؟",
+  "assistantUnavailable": "ما قدرت أوصل للمساعد حالياً. جرّب مرة أخرى.",
+  "assistantTooManyQuestions": "أسئلة كثيرة بوقت قصير. انتظر دقيقة وجرّب مرة أخرى.",
   "assistantInputHint": "اكتب رسالتك هنا...",
   "ratingTitle": "تقييم تجربتك",
   "ratingSubtitle": "نود معرفة رأيك لمساعدتنا على تحسين خدماتنا",

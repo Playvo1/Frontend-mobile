@@ -240,6 +240,8 @@
   "assistantQ4": "How much do pitches cost?",
   "assistantQ5": "What are your opening hours?",
   "assistantQ6": "How do I cancel a booking?",
+  "assistantUnavailable": "I could not reach the assistant right now. Please try again.",
+  "assistantTooManyQuestions": "That is a lot of questions at once. Wait a moment and try again.",
   "assistantInputHint": "Write your message here...",
   "ratingTitle": "Rate your experience",
   "ratingSubtitle": "We would like your opinion so we can improve our service",
