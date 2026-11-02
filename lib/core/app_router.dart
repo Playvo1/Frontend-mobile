@@ -127,14 +127,18 @@ class AppRouter {
     );
   }
 
+  /// [date] opens the slot grid on a specific day, which is how an
+  /// assistant suggestion lands on the hour it offered rather than today.
   static Future<void> toVenueDetails(
       BuildContext context,
-      int venueId,
-      ) {
+      int venueId, {
+        DateTime? date,
+      }) {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => VenueDetailsScreen(
           venueId: venueId,
+          initialDate: date,
         ),
       ),
     );

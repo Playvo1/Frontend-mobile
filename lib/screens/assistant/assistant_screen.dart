@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import '../../core/api_exception.dart';
 import '../../core/api_response.dart';
 import '../../core/failure_messages.dart';
+import '../../core/app_router.dart';
 import '../../l10n/l10n.dart';
 import '../../models/assistant_reply.dart';
 import '../../services/assistant_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../widgets/fixed_chevron.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/app_illustration.dart';
 import '../../widgets/diagnostics_panel.dart';
@@ -18,6 +20,7 @@ class AssistantMessage {
     required this.text,
     required this.isFromPlayer,
     this.options = const <AssistantOption>[],
+    this.suggestions = const <AssistantSuggestion>[],
   });
 
   final String text;
@@ -26,6 +29,9 @@ class AssistantMessage {
   /// Choices offered with this answer. Tapping one sends its id back
   /// rather than making the player retype what the assistant just listed.
   final List<AssistantOption> options;
+
+  /// Bookable venue-and-hour pairs, shown as cards under the answer.
+  final List<AssistantSuggestion> suggestions;
 }
 
 /// "المساعد الذكي" — a chat where the player can ask about pitches and
@@ -89,7 +95,19 @@ class _AssistantScreenState extends State<AssistantScreen> {
     });
     _scrollToEnd();
 
+    // The id is a name such as `cheapest` or `use_location`; the service
+    // attaches the coordinates itself when the choice needs them.
     await _answer(() => _assistantService.choose(option.id));
+  }
+
+  /// Opens the suggested venue on the suggested day, so the slot grid is
+  /// already showing the hour the assistant just offered.
+  Future<void> _openSuggestion(AssistantSuggestion suggestion) async {
+    final int? venueId = suggestion.venueId;
+    if (venueId == null) {
+      return;
+    }
+    await AppRouter.toVenueDetails(context, venueId, date: suggestion.day);
   }
 
   /// Runs [request] and puts its outcome in the thread. A question that
@@ -101,6 +119,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     final AppLocalizations l10n = context.l10n;
     String text;
     List<AssistantOption> options = const <AssistantOption>[];
+    List<AssistantSuggestion> suggestions = const <AssistantSuggestion>[];
 
     try {
       final ApiResponse<AssistantReply> response = await request();
@@ -109,6 +128,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
       if (response.success && reply != null && reply.hasText) {
         text = reply.text;
         options = reply.options;
+        suggestions = reply.suggestions;
       } else if (response.statusCode == 429) {
         // The route is throttled, so asking quickly is an ordinary thing
         // to do and gets its own sentence.
@@ -132,6 +152,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
           text: text,
           isFromPlayer: false,
           options: options,
+          suggestions: suggestions,
         ),
       );
     });
@@ -221,38 +242,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
                         .toList(),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  _Bubble(text: l10n.assistantSampleUser, isFromPlayer: true),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        '9:41',
-                        style: Theme.of(context)
-                            .textTheme
-                            .labelSmall
-                            ?.copyWith(fontSize: 10),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.check,
-                        size: 13,
-                        color: AppColors.successAccent,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  _Bubble(text: l10n.assistantSampleReply, isFromPlayer: false),
-                  const SizedBox(height: AppSpacing.sm),
-                  _QuickReplies(
-                    labels: <String>[
-                      l10n.assistantOptionCurrent,
-                      l10n.assistantOptionArea,
-                      l10n.assistantOptionAll,
-                    ],
-                    onSelected: _send,
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
                   ..._messages.map(
                     (AssistantMessage message) => Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -262,6 +251,13 @@ class _AssistantScreenState extends State<AssistantScreen> {
                           _Bubble(
                             text: message.text,
                             isFromPlayer: message.isFromPlayer,
+                          ),
+                          ...message.suggestions.map(
+                            (AssistantSuggestion suggestion) =>
+                                _VenueSuggestionCard(
+                              suggestion: suggestion,
+                              onTap: () => _openSuggestion(suggestion),
+                            ),
                           ),
                           if (message.options.isNotEmpty)
                             _OptionChips(
@@ -284,6 +280,110 @@ class _AssistantScreenState extends State<AssistantScreen> {
               onSend: () => _send(_inputController.text),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A venue and a free hour the assistant found, as a card the player taps
+/// to go straight to that venue on that day.
+class _VenueSuggestionCard extends StatelessWidget {
+  const _VenueSuggestionCard({required this.suggestion, required this.onTap});
+
+  final AssistantSuggestion suggestion;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    final String? time = suggestion.timeRange;
+    final int? price = suggestion.price;
+    final double? rating = suggestion.rating;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusField),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusField),
+            border: Border.all(color: AppColors.fieldBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      suggestion.name,
+                      style: textTheme.labelLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (rating != null) ...<Widget>[
+                    const Icon(Icons.star, size: 14, color: AppColors.orange),
+                    const SizedBox(width: 2),
+                    Text(
+                      rating.toStringAsFixed(1),
+                      style: textTheme.labelSmall,
+                    ),
+                  ],
+                ],
+              ),
+              if (suggestion.area.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 2),
+                Row(
+                  children: <Widget>[
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 13,
+                      color: AppColors.navy300,
+                    ),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        suggestion.area,
+                        style: textTheme.labelSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: <Widget>[
+                  if (time != null) ...<Widget>[
+                    const Icon(
+                      Icons.schedule,
+                      size: 13,
+                      color: AppColors.navy300,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(time, style: textTheme.labelSmall),
+                    const SizedBox(width: AppSpacing.md),
+                  ],
+                  if (price != null)
+                    Text(
+                      '$price ₪',
+                      style: textTheme.labelMedium?.copyWith(
+                        color: AppColors.orange,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  const Spacer(),
+                  const FixedChevron(pointsLeft: false, size: 16),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -499,47 +599,6 @@ class _InputBar extends StatelessWidget {
 }
 
 /// The chips the assistant offers after a question, so the player can
-/// answer with a tap instead of typing.
-class _QuickReplies extends StatelessWidget {
-  const _QuickReplies({required this.labels, required this.onSelected});
-
-  final List<String> labels;
-  final ValueChanged<String> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.sm,
-      runSpacing: AppSpacing.sm,
-      children: labels
-          .map(
-            (String label) => InkWell(
-              onTap: () => onSelected(label),
-              borderRadius: BorderRadius.circular(AppSpacing.sm),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.sm,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(AppSpacing.sm),
-                  border: Border.all(color: AppColors.successAccent),
-                ),
-                child: Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.navy900,
-                        fontSize: 12,
-                      ),
-                ),
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-}
 
 /// The three-dot bubble shown while the assistant is composing a reply.
 class _TypingBubble extends StatefulWidget {

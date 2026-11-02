@@ -1,16 +1,23 @@
-/// Environment-dependent configuration. Values come from `--dart-define`
-/// so no host or key is ever committed to Git (Guidelines 2.4), and each
-/// environment (local / staging / production) builds with its own values.
+/// Environment-dependent configuration. Every value can be overridden at
+/// build time with `--dart-define`, so a local backend or a staging host
+/// needs no code change:
 ///
-/// Example:
-///   flutter run --dart-define=PLAYVO_API_BASE_URL=https://staging.playvo.app/api/v1
+///   flutter run --dart-define=PLAYVO_API_BASE_URL=http://192.168.1.5:8000/api/v1
+///
+/// The defaults point at the deployed server, so a plain `flutter run` or
+/// `flutter build apk` produces a working app with real data and no flags.
 class AppConfig {
   AppConfig._();
 
   /// Always includes the `/api/v1` version prefix (Guidelines 2.2).
+  ///
+  /// Defaults to the deployed backend rather than a machine on someone's
+  /// local network: anyone who clones this and runs it should get a
+  /// working app, not a connection timeout to an address that is not
+  /// theirs.
   static const String apiBaseUrl = String.fromEnvironment(
     'PLAYVO_API_BASE_URL',
-  defaultValue: 'http://10.166.0.178:8000/api/v1',
+    defaultValue: 'https://playvo-backend.onrender.com/api/v1',
   );
 
   /// The same host without the `/api/v1` suffix. Uploaded images come
@@ -52,12 +59,16 @@ class AppConfig {
   /// Length of the verification code sent by the backend.
   static const int verificationCodeLength = 6;
 
-  /// Serves the home screen from [MockVenueService] instead of the API.
-  /// On by default because `GET /venues` does not exist yet; build with
-  /// `--dart-define=PLAYVO_MOCK_VENUES=false` to hit the real endpoint, and
-  /// flip the default once the backend ships it.
-  static const bool useMockVenues =
-      bool.fromEnvironment('PLAYVO_MOCK_VENUES', defaultValue: true);
+  /// Serves the venue screens from [MockVenueService] instead of the API.
+  ///
+  /// Off by default: the real endpoints are live, so the app shows real
+  /// venues out of the box. Build with
+  /// `--dart-define=PLAYVO_MOCK_VENUES=true` to work on the UI without a
+  /// backend.
+  static const bool useMockVenues = bool.fromEnvironment(
+    'PLAYVO_MOCK_VENUES',
+    defaultValue: false,
+  );
 
   /// Opens the dev screen gallery instead of the splash screen. Off unless
   /// the build passes `--dart-define=PLAYVO_GALLERY=true`, so it can never

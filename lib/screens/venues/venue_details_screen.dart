@@ -24,10 +24,15 @@ class VenueDetailsScreen extends StatefulWidget {
     super.key,
     required this.venueId,
     this.venueService,
+    this.initialDate,
   });
 
   final int venueId;
   final VenueService? venueService;
+
+  /// The day the slot grid opens on. Null means today — an assistant
+  /// suggestion passes the day it offered, so the hour is already there.
+  final DateTime? initialDate;
 
   @override
   State<VenueDetailsScreen> createState() => _VenueDetailsScreenState();
@@ -44,7 +49,7 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
   int _galleryIndex = 0;
   int? _selectedSlotId;
 
-  late DateTime _selectedDate = _today;
+  late DateTime _selectedDate = widget.initialDate ?? _today;
   late DateTime _stripStart = _today;
 
   static DateTime get _today {
