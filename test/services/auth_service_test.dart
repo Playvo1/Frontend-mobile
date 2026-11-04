@@ -32,12 +32,14 @@ void main() {
   setUp(() => tokenStorage = InMemoryTokenStorage());
 
   group('AuthService.login', () {
-    test('sends the contract body and stores the token on success', () async {
+    test('sends the contract body and stores the token on success',
+        () async {
       late http.Request captured;
 
       final AuthService service = _serviceReturning(
         (http.Request request) async {
           captured = request;
+
           return http.Response(
             jsonEncode(<String, dynamic>{
               'success': true,
@@ -55,7 +57,9 @@ void main() {
               'errors': null,
             }),
             200,
-            headers: <String, String>{'content-type': 'application/json'},
+            headers: <String, String>{
+              'content-type': 'application/json',
+            },
           );
         },
         tokenStorage: tokenStorage,
@@ -67,6 +71,7 @@ void main() {
       );
 
       expect(captured.url.toString(), '$_baseUrl/auth/login');
+
       expect(
         jsonDecode(captured.body),
         <String, dynamic>{
@@ -74,6 +79,7 @@ void main() {
           'password': 'Str0ngPass!',
         },
       );
+
       expect(response.success, isTrue);
       expect(response.data!.user.name, 'Omar Yousef');
       expect(response.data!.user.hasRole('player'), isTrue);
@@ -91,7 +97,9 @@ void main() {
             'errors': null,
           }),
           423,
-          headers: <String, String>{'content-type': 'application/json'},
+          headers: <String, String>{
+            'content-type': 'application/json',
+          },
         ),
         tokenStorage: tokenStorage,
       );
@@ -108,12 +116,16 @@ void main() {
 
     test('throws a typed exception when the body is not JSON', () async {
       final AuthService service = _serviceReturning(
-        (http.Request request) async => http.Response('<html>502</html>', 502),
+        (http.Request request) async =>
+            http.Response('<html>502</html>', 502),
         tokenStorage: tokenStorage,
       );
 
       expect(
-        () => service.login(email: 'omar@example.com', password: 'x'),
+        () => service.login(
+          email: 'omar@example.com',
+          password: 'x',
+        ),
         throwsA(
           isA<ApiException>().having(
             (ApiException e) => e.kind,
@@ -126,40 +138,53 @@ void main() {
   });
 
   group('AuthService.resetPassword', () {
-    test('sends email, code and the new password together', () async {
-      late http.Request captured;
+    test(
+      'sends email, OTP code, password and password confirmation',
+      () async {
+        late http.Request captured;
 
-      final AuthService service = _serviceReturning(
-        (http.Request request) async {
-          captured = request;
-          return http.Response(
-            jsonEncode(<String, dynamic>{
-              'success': true,
-              'data': null,
-              'message': 'Password updated',
-              'errors': null,
-            }),
-            200,
-          );
-        },
-        tokenStorage: tokenStorage,
-      );
+        final AuthService service = _serviceReturning(
+          (http.Request request) async {
+            captured = request;
 
-      await service.resetPassword(
-        email: 'omar@example.com',
-        code: '482913',
-        password: 'NewStr0ngPass!',
-      );
+            return http.Response(
+              jsonEncode(<String, dynamic>{
+                'success': true,
+                'data': null,
+                'message': 'Password updated',
+                'errors': null,
+              }),
+              200,
+              headers: <String, String>{
+                'content-type': 'application/json',
+              },
+            );
+          },
+          tokenStorage: tokenStorage,
+        );
 
-      expect(
-        jsonDecode(captured.body),
-        <String, dynamic>{
-          'email': 'omar@example.com',
-          'code': '482913',
-          'password': 'NewStr0ngPass!',
-        },
-      );
-    });
+        await service.resetPassword(
+          email: 'omar@example.com',
+          code: '482913',
+          password: 'NewStr0ngPass!',
+        );
+
+        expect(
+          captured.url.toString(),
+          '$_baseUrl/auth/reset-password',
+        );
+
+        expect(
+          jsonDecode(captured.body),
+          <String, dynamic>{
+            'email': 'omar@example.com',
+            'code': '482913',
+            'password': 'NewStr0ngPass!',
+            'password_confirmation': 'NewStr0ngPass!',
+          },
+        );
+      },
+    );
   });
 
   group('AuthService.logout', () {
@@ -167,12 +192,17 @@ void main() {
       await tokenStorage.write('1|abcdef');
 
       final AuthService service = _serviceReturning(
-        (http.Request request) async =>
-            throw const http.ClientException('offline'),
+        (http.Request request) async {
+          throw http.ClientException('offline');
+        },
         tokenStorage: tokenStorage,
       );
 
-      await expectLater(service.logout(), throwsA(isA<ApiException>()));
+      await expectLater(
+        service.logout(),
+        throwsA(isA<ApiException>()),
+      );
+
       expect(await tokenStorage.read(), isNull);
     });
   });
@@ -180,11 +210,13 @@ void main() {
   group('ApiClient auth header', () {
     test('sends the bearer token on authenticated calls only', () async {
       await tokenStorage.write('1|abcdef');
+
       final List<String?> seenHeaders = <String?>[];
 
       final AuthService service = _serviceReturning(
         (http.Request request) async {
           seenHeaders.add(request.headers['Authorization']);
+
           return http.Response(
             jsonEncode(<String, dynamic>{
               'success': true,
@@ -198,8 +230,8 @@ void main() {
         tokenStorage: tokenStorage,
       );
 
-      await service.forgotPassword('omar@example.com'); // public
-      await service.logout(); // authenticated
+      await service.forgotPassword('omar@example.com');
+      await service.logout();
 
       expect(seenHeaders.first, isNull);
       expect(seenHeaders.last, 'Bearer 1|abcdef');

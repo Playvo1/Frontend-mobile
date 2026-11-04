@@ -6,10 +6,9 @@ import 'venue.dart';
 /// description, the amenity tiles, the photo gallery and the slots for the
 /// chosen day.
 ///
-/// TODO(api): `GET /venues/{id}` is in the Postman collection with
-/// `date`/`hour` query parameters but no documented response body yet.
-/// Confirm these keys with the backend; they are read in one place so a
-/// rename is a single edit.
+/// Reads the shape the backend returns for one venue: the venue's own
+/// fields plus `images` and `time_slots`. Descriptions are bilingual like
+/// the rest of the text columns.
 class VenueDetails {
   const VenueDetails({
     required this.venue,
@@ -28,6 +27,18 @@ class VenueDetails {
 
   final String description;
 
+  /// Returns a copy with the slots replaced, used when availability is
+  /// refreshed from its own endpoint without refetching the venue.
+  VenueDetails copyWith({List<TimeSlot>? timeSlots}) {
+    return VenueDetails(
+      venue: venue,
+      photos: photos,
+      description: description,
+      amenities: amenities,
+      timeSlots: timeSlots ?? this.timeSlots,
+    );
+  }
+
   /// Flattens back into the shape [VenueDetails.fromJson] reads, so the
   /// cache stores one payload per venue and day.
   Map<String, dynamic> toJson() => <String, dynamic>{
@@ -38,15 +49,24 @@ class VenueDetails {
         'time_slots': timeSlots.map((TimeSlot s) => s.toJson()).toList(),
       };
 
+  /// The backend has no description column yet; the bilingual `area`
+  /// text is the closest thing the venue page can show.
+  static String _description(Map<String, dynamic> json) {
+    final Object? raw = json['description_ar'] ??
+        json['description_en'] ??
+        json['description'];
+    return raw?.toString() ?? '';
+  }
+
   factory VenueDetails.fromJson(Map<String, dynamic> json) {
-    final List<String> photos = (json['photos'] as List<dynamic>? ?? <dynamic>[])
-        .map((dynamic p) => p is String ? p : (p as Map<String, dynamic>)['url'].toString())
-        .toList();
+    // The venue parser already resolves `images[].image_url` against the
+    // API host, so the gallery reuses that rather than parsing twice.
+    final Venue venue = Venue.fromJson(json);
 
     return VenueDetails(
-      venue: Venue.fromJson(json),
-      photos: photos,
-      description: json['description'] as String? ?? '',
+      venue: venue,
+      photos: venue.photos,
+      description: _description(json),
       amenities: (json['amenities'] as List<dynamic>? ?? <dynamic>[])
           .map((dynamic a) => Amenity.fromJson(a as Map<String, dynamic>))
           .toList(),

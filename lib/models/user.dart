@@ -1,3 +1,5 @@
+import '../core/app_config.dart';
+
 /// A Playvo account, mapped one-to-one onto the USER entity
 /// (Guidelines 3). Field names match the API exactly — `name`, not
 /// `fullName`; `email_verified_at`, not `isVerified` — so a field is never
@@ -15,6 +17,7 @@ class User {
     required this.status,
     this.phone,
     this.emailVerifiedAt,
+    this.photoUrl,
   });
 
   final int id;
@@ -32,6 +35,11 @@ class User {
 
   final DateTime? emailVerifiedAt;
 
+  /// Absolute URL of the profile picture. The backend sends a path
+  /// relative to its root, so it is resolved against the API host the same
+  /// way venue images are.
+  final String? photoUrl;
+
   bool get isActive => status == UserStatus.active;
 
   bool hasRole(String role) => roles.contains(role);
@@ -48,6 +56,7 @@ class User {
           .toList(),
       status: json['status'] as String? ?? UserStatus.active,
       emailVerifiedAt: verifiedAt == null ? null : DateTime.tryParse(verifiedAt),
+      photoUrl: _photoUrl(json),
     );
   }
 
@@ -59,7 +68,27 @@ class User {
         'roles': roles,
         'status': status,
         'email_verified_at': emailVerifiedAt?.toIso8601String(),
+        'photo_url': photoUrl,
       };
+
+  /// The picture has arrived under several names across endpoints, so each
+  /// is tried before giving up.
+  static String? _photoUrl(Map<String, dynamic> json) {
+    for (final String key in const <String>[
+      'photo_url',
+      'profile_photo_url',
+      'photo',
+      'avatar_url',
+      'avatar',
+      'image_url',
+    ]) {
+      final String raw = (json[key] ?? '').toString().trim();
+      if (raw.isNotEmpty) {
+        return AppConfig.resolveFileUrl(raw);
+      }
+    }
+    return null;
+  }
 }
 
 /// The fixed USER.status strings from Guidelines 3.1. Never compare against

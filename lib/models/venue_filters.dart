@@ -123,7 +123,7 @@ class VenueFilters {
   /// Applies the filters locally. Used by the mock service while the venue
   /// endpoints are being built, so the sheet can be exercised end to end.
   bool matches(Venue venue) {
-    if (city != null && venue.city != city) {
+    if (!_cityMatches(venue)) {
       return false;
     }
     if (sportType != null && venue.sportType != sportType) {
@@ -144,5 +144,27 @@ class VenueFilters {
       }
     }
     return true;
+  }
+
+  /// The id decides when both sides have one; otherwise the name is
+  /// compared against every spelling the venue carries, because the sheet
+  /// lists cities in Arabic while a venue read in English reports "Gaza".
+  bool _cityMatches(Venue venue) {
+    if (city == null && cityId == null) {
+      return true;
+    }
+    if (cityId != null && venue.cityId != null) {
+      return venue.cityId == cityId;
+    }
+    if (city == null) {
+      return true;
+    }
+
+    final String wanted = city!.trim().toLowerCase();
+    if (venue.city.trim().toLowerCase() == wanted) {
+      return true;
+    }
+    return venue.cityAliases
+        .any((String name) => name.trim().toLowerCase() == wanted);
   }
 }

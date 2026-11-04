@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/l10n.dart';
 import '../theme/app_colors.dart';
+import 'fixed_chevron.dart';
 import '../theme/app_spacing.dart';
 import 'venue_photo.dart';
 
@@ -128,7 +129,7 @@ class _StartBookingButton extends StatelessWidget {
         children: <Widget>[
           Text(label),
           const SizedBox(width: AppSpacing.xs),
-          const Icon(Icons.chevron_left, size: 18),
+          const FixedChevron(size: 18),
         ],
       ),
     );

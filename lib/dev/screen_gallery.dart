@@ -16,6 +16,12 @@ import '../screens/booking/booking_details_screen.dart';
 import '../screens/booking/booking_confirmation_screen.dart';
 import '../screens/booking/payment_proof_screen.dart';
 import '../screens/account/account_screen.dart';
+import '../screens/notifications/notification_settings_screen.dart';
+import '../screens/notifications/notifications_screen.dart';
+import '../screens/settings/change_password_screen.dart';
+import '../screens/settings/data_access_screen.dart';
+import '../screens/settings/data_protection_screen.dart';
+import '../screens/settings/privacy_security_screen.dart';
 import '../screens/account/edit_profile_screen.dart';
 import '../screens/assistant/assistant_screen.dart';
 import '../screens/bookings/my_bookings_screen.dart';
@@ -26,6 +32,7 @@ import '../screens/venues/venue_map_screen.dart';
 import '../screens/venues/venue_search_screen.dart';
 import '../services/mock_booking_service.dart';
 import '../services/mock_venue_service.dart';
+import '../services/notification_service.dart';
 import '../screens/splash_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -36,8 +43,7 @@ import 'preview_auth_service.dart';
 /// team can review the UI without walking the flows or running a backend.
 ///
 /// DEV ONLY. It is reachable only when the app is built with
-/// `--dart-define=PLAYVO_GALLERY=true`, so it can never appear in a release
-/// build, and `lib/dev/` is deleted once the real API is connected.
+/// --dart-define=PLAYVO_GALLERY=true.
 class ScreenGallery extends StatelessWidget {
   const ScreenGallery({super.key});
 
@@ -50,7 +56,10 @@ class ScreenGallery extends StatelessWidget {
         foregroundColor: AppColors.white,
         actions: const <Widget>[
           Padding(
-            padding: EdgeInsets.only(left: AppSpacing.sm, right: AppSpacing.sm),
+            padding: EdgeInsets.only(
+              left: AppSpacing.sm,
+              right: AppSpacing.sm,
+            ),
             child: Center(child: LanguageSelector()),
           ),
         ],
@@ -114,11 +123,10 @@ class ScreenGallery extends StatelessWidget {
             title: 'Reset password',
             builder: (_) => ResetPasswordScreen(
               email: 'omar@example.com',
-              // code: '482913',
+              code: '482913',
               authService: PreviewAuthService.alwaysOk,
             ),
           ),
-
           _GalleryEntry(
             title: 'Reset password — success',
             subtitle: 'Shown after the password is actually changed',
@@ -175,7 +183,10 @@ class ScreenGallery extends StatelessWidget {
             title: 'Booking — step 2, payment proof',
             subtitle: 'Choosing a receipt needs a real device or emulator',
             builder: (_) => PaymentProofScreen(
-              booking: const Booking(id: 18, status: BookingStatus.pending),
+              booking: const Booking(
+                id: 18,
+                status: BookingStatus.pending,
+              ),
               venue: _sampleVenue,
               slot: _sampleSlot,
               date: DateTime.now(),
@@ -185,7 +196,10 @@ class ScreenGallery extends StatelessWidget {
           _GalleryEntry(
             title: 'Booking — step 3, confirmation',
             builder: (_) => BookingConfirmationScreen(
-              booking: const Booking(id: 258731, status: BookingStatus.pending),
+              booking: const Booking(
+                id: 258731,
+                status: BookingStatus.pending,
+              ),
               venue: _sampleVenue,
               slot: _sampleSlot,
               date: DateTime.now(),
@@ -213,7 +227,7 @@ class ScreenGallery extends StatelessWidget {
           _GalleryEntry(
             title: 'My account',
             builder: (_) => AccountScreen(
-              bookingService: MockBookingService(),
+              authService: PreviewAuthService.signedIn,
             ),
           ),
           _GalleryEntry(
@@ -227,6 +241,34 @@ class ScreenGallery extends StatelessWidget {
           _GalleryEntry(
             title: 'Rate your experience',
             builder: (_) => const RatingScreen(),
+          ),
+          _GalleryEntry(
+            title: 'Notifications',
+            subtitle: 'Grouped by day, with read and unread rows',
+            builder: (_) => NotificationsScreen(
+              notificationService: MockNotificationService(),
+            ),
+          ),
+          _GalleryEntry(
+            title: 'Notification settings',
+            subtitle: 'Master switch plus the three types',
+            builder: (_) => const NotificationSettingsScreen(),
+          ),
+          _GalleryEntry(
+            title: 'Privacy and security',
+            builder: (_) => const PrivacySecurityScreen(),
+          ),
+          _GalleryEntry(
+            title: 'Change password',
+            builder: (_) => const ChangePasswordScreen(),
+          ),
+          _GalleryEntry(
+            title: 'Privacy and data protection',
+            builder: (_) => const DataProtectionScreen(),
+          ),
+          _GalleryEntry(
+            title: 'Data access permissions',
+            builder: (_) => const DataAccessScreen(),
           ),
 
           const _SectionHeader('Other'),

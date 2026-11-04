@@ -6,6 +6,17 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 abstract class TokenStorage {
   Future<String?> read();
   Future<void> write(String token);
+
+  /// The signed-in account as JSON, kept beside the token.
+  ///
+  /// Login already returns the account, so the profile screen has no reason
+  /// to depend on a second round trip to show a name and an email. It sits
+  /// in the encrypted store rather than plain preferences because it is
+  /// personal data, and [clear] wipes it with the token.
+  Future<String?> readProfile();
+  Future<void> writeProfile(String json);
+
+  /// Wipes BOTH the token and the cached profile.
   Future<void> clear();
 }
 
@@ -16,6 +27,7 @@ class SecureTokenStorage implements TokenStorage {
   const SecureTokenStorage();
 
   static const String _key = 'playvo_auth_token';
+  static const String _profileKey = 'playvo_auth_profile';
   static const FlutterSecureStorage _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
@@ -27,12 +39,24 @@ class SecureTokenStorage implements TokenStorage {
   Future<void> write(String token) => _storage.write(key: _key, value: token);
 
   @override
-  Future<void> clear() => _storage.delete(key: _key);
+  Future<String?> readProfile() => _storage.read(key: _profileKey);
+
+  @override
+  Future<void> writeProfile(String json) =>
+      _storage.write(key: _profileKey, value: json);
+
+  /// Both keys go, so signing out leaves no name or email on the device.
+  @override
+  Future<void> clear() async {
+    await _storage.delete(key: _key);
+    await _storage.delete(key: _profileKey);
+  }
 }
 
 /// In-memory implementation for tests.
 class InMemoryTokenStorage implements TokenStorage {
   String? _token;
+  String? _profile;
 
   @override
   Future<String?> read() async => _token;
@@ -41,5 +65,14 @@ class InMemoryTokenStorage implements TokenStorage {
   Future<void> write(String token) async => _token = token;
 
   @override
-  Future<void> clear() async => _token = null;
+  Future<String?> readProfile() async => _profile;
+
+  @override
+  Future<void> writeProfile(String json) async => _profile = json;
+
+  @override
+  Future<void> clear() async {
+    _token = null;
+    _profile = null;
+  }
 }

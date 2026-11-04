@@ -24,38 +24,34 @@ class BookingStepper extends StatelessWidget {
       l10n.stepConfirmation,
     ];
 
-    // Step 1 sits on the LEFT in the design, so the row is laid out
-    // left-to-right regardless of the app's direction. The labels inside
-    // stay Arabic and render normally.
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: List<Widget>.generate(labels.length * 2 - 1, (int index) {
-          if (index.isOdd) {
-            final int previous = index ~/ 2;
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 15),
-                child: Container(
-                  height: 1.5,
-                  color: previous < current.index
-                      ? AppColors.orange500
-                      : AppColors.grey200,
-                ),
+    // Step 1 sits on the RIGHT, so the row simply follows the app's
+    // direction: the first child of a Row is on the right in Arabic.
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List<Widget>.generate(labels.length * 2 - 1, (int index) {
+        if (index.isOdd) {
+          final int previous = index ~/ 2;
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 15),
+              child: Container(
+                height: 1.5,
+                color: previous < current.index
+                    ? AppColors.orange500
+                    : AppColors.grey200,
               ),
-            );
-          }
-
-          final int step = index ~/ 2;
-          return _Step(
-            number: step + 1,
-            label: labels[step],
-            isDone: step < current.index,
-            isCurrent: step == current.index,
+            ),
           );
-        }),
-      ),
+        }
+
+        final int step = index ~/ 2;
+        return _Step(
+          number: step + 1,
+          label: labels[step],
+          isDone: step < current.index,
+          isCurrent: step == current.index,
+        );
+      }),
     );
   }
 }

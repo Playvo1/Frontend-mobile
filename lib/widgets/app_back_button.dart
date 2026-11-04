@@ -28,10 +28,16 @@ class AppBackButton extends StatelessWidget {
           shape: BoxShape.circle,
           border: Border.all(color: AppColors.fieldBorder),
         ),
-        child: Icon(
-          Icons.chevron_left,
-          size: size * 0.55,
-          color: AppColors.navy900,
+        // Flutter mirrors chevron icons automatically in RTL
+        // (matchTextDirection), which is what kept flipping this arrow no
+        // matter how the row was ordered. Forcing LTR here pins it.
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Icon(
+            Icons.chevron_left,
+            size: size * 0.55,
+            color: AppColors.navy900,
+          ),
         ),
       ),
     );
@@ -58,23 +64,26 @@ class AppScreenHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final TextTheme textTheme = Theme.of(context).textTheme;
 
+    // The back button sits on its own row so the title clears it, which is
+    // how every screen in the design is laid out.
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                title,
-                textAlign: centerTitle ? TextAlign.center : TextAlign.start,
-                style: textTheme.headlineSmall,
-              ),
-            ),
-            AppBackButton(onPressed: onBack),
-          ],
+        // Physically left, not "end": in English, end resolves to the right
+        // and the button jumps sides. The design keeps it left in both
+        // languages, so this alignment is physical on purpose.
+        Align(
+          alignment: Alignment.centerLeft,
+          child: AppBackButton(onPressed: onBack),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          title,
+          textAlign: centerTitle ? TextAlign.center : TextAlign.start,
+          style: textTheme.headlineSmall,
         ),
         if (subtitle != null) ...<Widget>[
-          const SizedBox(height: 5),
+          const SizedBox(height: 6),
           Text(
             subtitle!,
             textAlign: centerTitle ? TextAlign.center : TextAlign.start,

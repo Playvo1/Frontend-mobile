@@ -151,7 +151,12 @@ class _Arrow extends StatelessWidget {
       customBorder: const CircleBorder(),
       child: Padding(
         padding: const EdgeInsets.all(2),
-        child: Icon(icon, size: 20, color: AppColors.navy300),
+        // Pinned: these arrows step the window, so their direction is
+        // fixed rather than following the reading direction.
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Icon(icon, size: 20, color: AppColors.navy300),
+        ),
       ),
     );
   }

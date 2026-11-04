@@ -42,6 +42,7 @@ class MockBookingService implements BookingService {
       ),
       date: DateTime.now().subtract(const Duration(days: 9)),
       totalPrice: 50,
+      score: '2 - 3',
     ),
     Booking(
       id: 240112,
@@ -56,6 +57,36 @@ class MockBookingService implements BookingService {
       ),
       date: DateTime.now().subtract(const Duration(days: 13)),
       totalPrice: 50,
+    ),
+    Booking(
+      id: 239004,
+      status: BookingStatus.completed,
+      venue: _venue('ملعب المدينة', 'الشيخ رضوان', 'assets/venues/venue_1.jpg'),
+      slot: const TimeSlot(
+        id: 4,
+        startTime: '20:00',
+        endTime: '22:00',
+        isAvailable: false,
+        price: 50,
+      ),
+      date: DateTime(2026, 9, 3),
+      totalPrice: 50,
+      score: '1 - 4',
+    ),
+    Booking(
+      id: 238110,
+      status: BookingStatus.completed,
+      venue: _venue('ملعب الشباب', 'الرمال', 'assets/venues/venue_4.jpg'),
+      slot: const TimeSlot(
+        id: 5,
+        startTime: '20:00',
+        endTime: '22:00',
+        isAvailable: false,
+        price: 50,
+      ),
+      date: DateTime(2026, 9, 1),
+      totalPrice: 50,
+      score: '2 - 3',
     ),
   ];
 
@@ -74,28 +105,46 @@ class MockBookingService implements BookingService {
   }
 
   @override
-  Future<ApiResponse<List<Booking>>> myBookings() async {
+  Future<ApiResponse<List<Booking>>> myBookings({
+    int page = 1,
+    String? sportType,
+  }) async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
+    // The sample set is one page long, so later pages come back empty —
+    // which is what tells the screen it has reached the end.
+    final List<Booking> matching = sportType == null
+        ? List<Booking>.of(_bookings)
+        : _bookings
+            .where((Booking b) => b.venue?.sportType == sportType)
+            .toList();
     return ApiResponse<List<Booking>>(
       success: true,
       message: '',
-      data: List<Booking>.of(_bookings),
+      data: page == 1 ? matching : <Booking>[],
     );
+  }
+
+  @override
+  Future<ApiResponse<void>> rate({
+    required int bookingId,
+    required int stars,
+    required List<String> tags,
+    required String notes,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    final int index = _bookings.indexWhere((Booking b) => b.id == bookingId);
+    if (index != -1) {
+      _bookings[index] = _bookings[index].copyWith(isRated: true);
+    }
+    return const ApiResponse<void>(success: true, message: '');
   }
 
   @override
   Future<ApiResponse<Booking>> cancel(int bookingId) async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
     final int index = _bookings.indexWhere((Booking b) => b.id == bookingId);
-    final Booking original = _bookings[index];
-    final Booking cancelled = Booking(
-      id: original.id,
-      status: BookingStatus.cancelled,
-      venue: original.venue,
-      slot: original.slot,
-      date: original.date,
-      totalPrice: original.totalPrice,
-    );
+    final Booking cancelled =
+        _bookings[index].copyWith(status: BookingStatus.cancelled);
     _bookings[index] = cancelled;
     return ApiResponse<Booking>(success: true, message: '', data: cancelled);
   }
@@ -135,7 +184,10 @@ class EmptyBookingService extends MockBookingService {
   EmptyBookingService();
 
   @override
-  Future<ApiResponse<List<Booking>>> myBookings() async {
+  Future<ApiResponse<List<Booking>>> myBookings({
+    int page = 1,
+    String? sportType,
+  }) async {
     await Future<void>.delayed(const Duration(milliseconds: 250));
     return const ApiResponse<List<Booking>>(
       success: true,

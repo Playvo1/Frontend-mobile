@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' show Position;
+import 'package:latlong2/latlong.dart';
 
 import '../../core/api_exception.dart';
 import '../../core/api_response.dart';
 import '../../core/app_router.dart';
+import '../../core/location_service.dart';
 import '../../l10n/l10n.dart';
 import '../../models/amenity.dart';
 import '../../models/venue.dart';
@@ -11,7 +14,9 @@ import '../../services/venue_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_bottom_nav.dart';
+import '../../widgets/assistant_fab.dart';
 import '../../widgets/home_search_field.dart';
+import '../../widgets/venue_map_view.dart';
 import '../../widgets/venue_photo.dart';
 import '../home/venue_filter_sheet.dart';
 import 'venue_search_screen.dart';
@@ -28,10 +33,20 @@ class VenueMapScreen extends StatefulWidget {
     super.key,
     required this.filters,
     this.venueService,
+    this.locationService,
+    this.focusedVenueId,
   });
 
   final VenueFilters filters;
   final VenueService? venueService;
+
+  /// Injectable so the screen can be opened in the gallery and in tests
+  /// without touching the device's GPS.
+  final LocationService? locationService;
+
+  /// Opens with this venue selected, used by the map button on a result
+  /// card. Null selects the first result.
+  final int? focusedVenueId;
 
   @override
   State<VenueMapScreen> createState() => _VenueMapScreenState();
@@ -40,6 +55,10 @@ class VenueMapScreen extends StatefulWidget {
 class _VenueMapScreenState extends State<VenueMapScreen> {
   late final VenueService _venueService =
       widget.venueService ?? VenueService.create();
+  late final LocationService _locationService =
+      widget.locationService ?? const LocationService();
+
+  LatLng? _userPosition;
 
   final TextEditingController _searchController = TextEditingController();
 
@@ -52,6 +71,57 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
   void initState() {
     super.initState();
     _load();
+    _locate();
+  }
+
+  /// Asks for the player's position once the map is on screen. A refusal
+  /// is not an error here: the map still works, it just has no blue dot
+  /// and cannot order venues by distance.
+  Future<void> _locate() async {
+    try {
+      final Position position = await _locationService.currentPosition();
+      if (mounted) {
+        setState(() {
+          _userPosition = LatLng(position.latitude, position.longitude);
+          _venues = _sortByDistance(_venues);
+        });
+      }
+    } on LocationException {
+      // Left as it is; the map opens on Gaza instead.
+    }
+  }
+
+  /// Nearest first, when a position is known. Venues without coordinates
+  /// keep their server order at the end of the list.
+  List<Venue> _sortByDistance(List<Venue> venues) {
+    final LatLng? from = _userPosition;
+    if (from == null) {
+      return venues;
+    }
+
+    final List<Venue> sorted = List<Venue>.of(venues);
+    sorted.sort((Venue a, Venue b) {
+      if (!a.hasCoordinates) {
+        return 1;
+      }
+      if (!b.hasCoordinates) {
+        return -1;
+      }
+      final double toA = _locationService.distanceBetween(
+        fromLatitude: from.latitude,
+        fromLongitude: from.longitude,
+        toLatitude: a.latitude!,
+        toLongitude: a.longitude!,
+      );
+      final double toB = _locationService.distanceBetween(
+        fromLatitude: from.latitude,
+        fromLongitude: from.longitude,
+        toLatitude: b.latitude!,
+        toLongitude: b.longitude!,
+      );
+      return toA.compareTo(toB);
+    });
+    return sorted;
   }
 
   Future<void> _load() async {
@@ -62,10 +132,15 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
       if (!mounted) {
         return;
       }
-      final List<Venue> venues = response.data ?? <Venue>[];
+      final List<Venue> venues = _sortByDistance(response.data ?? <Venue>[]);
       setState(() {
         _venues = venues;
-        _selected = venues.isEmpty ? null : venues.first;
+        _selected = venues.isEmpty
+            ? null
+            : venues.firstWhere(
+                (Venue v) => v.id == widget.focusedVenueId,
+                orElse: () => venues.first,
+              );
       });
     } on ApiException {
       // The placeholder map still renders; the list simply stays empty.
@@ -90,7 +165,7 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
   Future<void> _openFilters() async {
     final VenueFilters? applied =
         await VenueFilterSheet.show(context, _filters);
-    if (applied == null) {
+    if (applied == null || !mounted) {
       return;
     }
     setState(() => _filters = applied);
@@ -103,6 +178,9 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.grey100,
+      floatingActionButtonLocation:
+          FloatingActionButtonLocation.startFloat,
+      floatingActionButton: const AssistantFab(),
       bottomNavigationBar: AppBottomNav(
         current: AppTab.home,
         onSelected: (AppTab tab) => AppRouter.switchTab(context, tab),
@@ -137,9 +215,10 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _MapArea(
+                : VenueMapView(
                     venues: _venues,
                     selected: _selected,
+                    userPosition: _userPosition,
                     onSelected: (Venue venue) =>
                         setState(() => _selected = venue),
                   ),
@@ -149,119 +228,6 @@ class _VenueMapScreenState extends State<VenueMapScreen> {
               venue: _selected!,
               onTap: () => AppRouter.toVenueDetails(context, _selected!.id),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Stands in for the real map until the maps package is wired up. Pins are
-/// spread over the area in result order, so they are illustrative only.
-class _MapArea extends StatelessWidget {
-  const _MapArea({
-    required this.venues,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final List<Venue> venues;
-  final Venue? selected;
-  final ValueChanged<Venue> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        return Stack(
-          children: <Widget>[
-            Positioned.fill(
-              child: Container(
-                color: const Color(0xFFE8EDF2),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xl),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        const Icon(
-                          Icons.map_outlined,
-                          size: 34,
-                          color: AppColors.navy300,
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          context.l10n.mapUnavailable,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.labelSmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            for (int i = 0; i < venues.length; i++)
-              Positioned(
-                left: constraints.maxWidth * (0.15 + (i % 3) * 0.28),
-                top: constraints.maxHeight * (0.12 + (i ~/ 3) * 0.26),
-                child: _Pin(
-                  venue: venues[i],
-                  isSelected: venues[i].id == selected?.id,
-                  onTap: () => onSelected(venues[i]),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-/// One map marker: a ball in a teardrop, orange when selected.
-class _Pin extends StatelessWidget {
-  const _Pin({
-    required this.venue,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  final Venue venue;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color color = isSelected ? AppColors.orange500 : AppColors.navy900;
-
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (isSelected)
-            Container(
-              margin: const EdgeInsets.only(bottom: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(AppSpacing.md),
-                border: Border.all(color: AppColors.orange500),
-              ),
-              child: Text(
-                venue.name,
-                style: const TextStyle(fontSize: 10, color: AppColors.navy900),
-              ),
-            ),
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            child: const Icon(
-              Icons.sports_soccer,
-              size: 17,
-              color: AppColors.white,
-            ),
-          ),
         ],
       ),
     );

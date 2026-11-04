@@ -7,7 +7,6 @@ import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/app_back_button.dart';
 import '../widgets/app_bottom_nav.dart';
-import '../widgets/back_circle_button.dart';
 
 /// Shown when the app cannot reach the API. It names exactly what is
 /// cached, so the player knows what still works offline (SRS FR-34/FR-35,
@@ -41,71 +40,83 @@ class OfflineScreen extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
+            // Centres the block on a tall screen, but still scrolls on a
+            // short one instead of overflowing.
             return SingleChildScrollView(
-              // Centres the block on a tall screen but still scrolls on a
-              // short one, instead of stranding it near the top.
+              padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      const Align(
-                        alignment: AlignmentDirectional.centerStart,
-                        child: BackCircleButton(),
+                // A Stack, not a Column with Spacers: a flexible child
+                // inside a scroll view has no height to expand into and
+                // throws. The back button floats at the top, the block
+                // centres itself.
+                child: Stack(
+                  children: <Widget>[
+                    // Physically left in both languages, as elsewhere.
+                    Align(
+                      alignment: Alignment.topLeft,
+                      child: AppBackButton(onPressed: onContinueOffline),
+                    ),
+                    Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                    Text(
+                      l10n.offlineTitle,
+                      textAlign: TextAlign.center,
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      l10n.offlineSubtitle,
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodySmall?.copyWith(height: 1.8),
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    ValueListenableBuilder<DateTime?>(
+                      valueListenable: OfflineState.lastSyncedAt,
+                      builder: (
+                        BuildContext context,
+                        DateTime? syncedAt,
+                        Widget? _,
+                      ) {
+                        return _CachedDataCard(
+                          lastSyncedLabel: lastSyncedLabel ??
+                              (syncedAt == null
+                                  ? null
+                                  : SyncTimeFormat.label(syncedAt, l10n)),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.xl),
+                    ElevatedButton(
+                      onPressed: onContinueOffline,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          const Icon(Icons.arrow_back, size: 18),
+                          const SizedBox(width: AppSpacing.sm),
+                          Text(l10n.continueOffline),
+                        ],
                       ),
-                      const Spacer(),
-                      Text(
-                        l10n.offlineTitle,
-                        textAlign: TextAlign.center,
-                        style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    OutlinedButton(
+                      onPressed: onRetry,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          const Icon(Icons.refresh, size: 18),
+                          const SizedBox(width: AppSpacing.sm),
+                          Text(l10n.tryAgain),
+                        ],
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        l10n.offlineSubtitle,
-                        textAlign: TextAlign.center,
-                        style: textTheme.bodySmall?.copyWith(height: 1.8),
+                    ),
+                        ],
                       ),
-                      const SizedBox(height: AppSpacing.xl),
-                      ValueListenableBuilder<DateTime?>(
-              valueListenable: OfflineState.lastSyncedAt,
-              builder: (BuildContext context, DateTime? syncedAt, Widget? _) {
-                return _CachedDataCard(
-                  lastSyncedLabel: lastSyncedLabel ??
-                      (syncedAt == null
-                          ? null
-                          : SyncTimeFormat.label(syncedAt, l10n)),
-                );
-              },
-            ),
-                      const SizedBox(height: AppSpacing.xl),
-                      ElevatedButton(
-              onPressed: onContinueOffline,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  const Icon(Icons.arrow_back, size: 18),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text(l10n.continueOffline),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            OutlinedButton(
-              onPressed: onRetry,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  const Icon(Icons.refresh, size: 18),
-                  const SizedBox(width: AppSpacing.sm),
-                  Text(l10n.tryAgain),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             );
@@ -180,21 +191,14 @@ class _CachedDataCard extends StatelessWidget {
                   style: textTheme.labelSmall?.copyWith(fontSize: 11),
                 ),
                 const SizedBox(width: 5),
-                Text(
-                  '•',
-                  style: textTheme.labelSmall?.copyWith(fontSize: 11),
-                ),
+                Text('•', style: textTheme.labelSmall?.copyWith(fontSize: 11)),
                 const SizedBox(width: 5),
                 Text(
                   l10n.lastUpdated,
                   style: textTheme.labelSmall?.copyWith(fontSize: 11),
                 ),
                 const SizedBox(width: 5),
-                const Icon(
-                  Icons.schedule,
-                  size: 13,
-                  color: AppColors.navy300,
-                ),
+                const Icon(Icons.schedule, size: 13, color: AppColors.navy300),
               ],
             ),
           ],

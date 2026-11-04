@@ -1,26 +1,50 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api_exception.dart';
+import '../../core/api_response.dart';
+import '../../core/failure_messages.dart';
+import '../../core/app_router.dart';
 import '../../l10n/l10n.dart';
+import '../../models/assistant_reply.dart';
+import '../../services/assistant_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../widgets/fixed_chevron.dart';
 import '../../widgets/app_back_button.dart';
+import '../../widgets/app_illustration.dart';
+import '../../widgets/diagnostics_panel.dart';
 
 /// One line of the conversation.
 class AssistantMessage {
-  const AssistantMessage({required this.text, required this.isFromPlayer});
+  const AssistantMessage({
+    required this.text,
+    required this.isFromPlayer,
+    this.options = const <AssistantOption>[],
+    this.suggestions = const <AssistantSuggestion>[],
+  });
 
   final String text;
   final bool isFromPlayer;
+
+  /// Choices offered with this answer. Tapping one sends its id back
+  /// rather than making the player retype what the assistant just listed.
+  final List<AssistantOption> options;
+
+  /// Bookable venue-and-hour pairs, shown as cards under the answer.
+  final List<AssistantSuggestion> suggestions;
 }
 
 /// "المساعد الذكي" — a chat where the player can ask about pitches and
 /// bookings, with example questions to start from.
 ///
-/// TODO(api): there is no assistant endpoint yet, so replies are not
-/// generated — sending a message only adds it to the thread. Point
-/// [_send] at the endpoint once the backend adds one.
+/// Wired to `POST /assistant/query`, which is authenticated and rate
+/// limited. A failure is answered inside the thread rather than as a
+/// banner, so the conversation still reads as a conversation.
 class AssistantScreen extends StatefulWidget {
-  const AssistantScreen({super.key});
+  const AssistantScreen({super.key, this.assistantService});
+
+  /// Injectable so the screen can be exercised without a network.
+  final AssistantService? assistantService;
 
   @override
   State<AssistantScreen> createState() => _AssistantScreenState();
@@ -32,6 +56,12 @@ class _AssistantScreenState extends State<AssistantScreen> {
 
   final List<AssistantMessage> _messages = <AssistantMessage>[];
 
+  late final AssistantService _assistantService =
+      widget.assistantService ?? AssistantService();
+
+  /// Drawn as the three-dot bubble while a reply is on its way.
+  bool _isAssistantTyping = false;
+
   @override
   void dispose() {
     _inputController.dispose();
@@ -39,7 +69,7 @@ class _AssistantScreenState extends State<AssistantScreen> {
     super.dispose();
   }
 
-  void _send(String text) {
+  Future<void> _send(String text) async {
     final String trimmed = text.trim();
     if (trimmed.isEmpty) {
       return;
@@ -47,8 +77,91 @@ class _AssistantScreenState extends State<AssistantScreen> {
     setState(() {
       _messages.add(AssistantMessage(text: trimmed, isFromPlayer: true));
       _inputController.clear();
+      _isAssistantTyping = true;
     });
-    // Jump to the newest message after the frame that adds it.
+    _scrollToEnd();
+
+    await _answer(() => _assistantService.ask(trimmed));
+  }
+
+  /// Sends the id of a choice the assistant offered, and echoes its label
+  /// into the thread so the conversation still reads in order.
+  Future<void> _choose(AssistantOption option) async {
+    setState(() {
+      _messages.add(
+        AssistantMessage(text: option.label, isFromPlayer: true),
+      );
+      _isAssistantTyping = true;
+    });
+    _scrollToEnd();
+
+    // The id is a name such as `cheapest` or `use_location`; the service
+    // attaches the coordinates itself when the choice needs them.
+    await _answer(() => _assistantService.choose(option.id));
+  }
+
+  /// Opens the suggested venue on the suggested day, so the slot grid is
+  /// already showing the hour the assistant just offered.
+  Future<void> _openSuggestion(AssistantSuggestion suggestion) async {
+    final int? venueId = suggestion.venueId;
+    if (venueId == null) {
+      return;
+    }
+    await AppRouter.toVenueDetails(context, venueId, date: suggestion.day);
+  }
+
+  /// Runs [request] and puts its outcome in the thread. A question that
+  /// vanishes without a response is the one outcome this screen must not
+  /// have, so a failure becomes a message rather than nothing.
+  Future<void> _answer(
+    Future<ApiResponse<AssistantReply>> Function() request,
+  ) async {
+    final AppLocalizations l10n = context.l10n;
+    String text;
+    List<AssistantOption> options = const <AssistantOption>[];
+    List<AssistantSuggestion> suggestions = const <AssistantSuggestion>[];
+
+    try {
+      final ApiResponse<AssistantReply> response = await request();
+      final AssistantReply? reply = response.data;
+
+      if (response.success && reply != null && reply.hasText) {
+        text = reply.text;
+        options = reply.options;
+        suggestions = reply.suggestions;
+      } else if (response.statusCode == 429) {
+        // The route is throttled, so asking quickly is an ordinary thing
+        // to do and gets its own sentence.
+        text = l10n.assistantTooManyQuestions;
+      } else {
+        text = response.message.trim().isNotEmpty
+            ? response.message.trim()
+            : l10n.assistantUnavailable;
+      }
+    } on ApiException catch (exception) {
+      text = FailureMessages.of(exception, l10n);
+    }
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _isAssistantTyping = false;
+      _messages.add(
+        AssistantMessage(
+          text: text,
+          isFromPlayer: false,
+          options: options,
+          suggestions: suggestions,
+        ),
+      );
+    });
+    _scrollToEnd();
+  }
+
+
+  /// Jumps to the newest message after the frame that adds it.
+  void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
@@ -83,7 +196,6 @@ class _AssistantScreenState extends State<AssistantScreen> {
               child: AppScreenHeader(
                 title: l10n.assistantTitle,
                 subtitle: l10n.assistantSubtitle,
-                centerTitle: true,
               ),
             ),
             Expanded(
@@ -93,11 +205,18 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   horizontal: AppSpacing.screenHorizontal,
                 ),
                 children: <Widget>[
-                  const Center(child: _AssistantMascot()),
-                  const SizedBox(height: AppSpacing.md),
-                  _Bubble(
-                    text: l10n.assistantGreeting,
-                    isFromPlayer: false,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: <Widget>[
+                      const _AssistantMascot(),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: _Bubble(
+                          text: l10n.assistantGreeting,
+                          isFromPlayer: false,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.xl),
                   Text(
@@ -108,10 +227,11 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   GridView.count(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisCount: 2,
+                    // Three across, two rows — as the design lays them out.
+                    crossAxisCount: 3,
                     mainAxisSpacing: AppSpacing.sm,
                     crossAxisSpacing: AppSpacing.sm,
-                    childAspectRatio: 1.9,
+                    childAspectRatio: 1.05,
                     children: suggestions
                         .map(
                           (_Suggestion s) => _SuggestionCard(
@@ -125,22 +245,191 @@ class _AssistantScreenState extends State<AssistantScreen> {
                   ..._messages.map(
                     (AssistantMessage message) => Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _Bubble(
-                        text: message.text,
-                        isFromPlayer: message.isFromPlayer,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          _Bubble(
+                            text: message.text,
+                            isFromPlayer: message.isFromPlayer,
+                          ),
+                          ...message.suggestions.map(
+                            (AssistantSuggestion suggestion) =>
+                                _VenueSuggestionCard(
+                              suggestion: suggestion,
+                              onTap: () => _openSuggestion(suggestion),
+                            ),
+                          ),
+                          if (message.options.isNotEmpty)
+                            _OptionChips(
+                              options: message.options,
+                              onSelected: _choose,
+                            ),
+                        ],
                       ),
                     ),
                   ),
+                  if (_isAssistantTyping) const _TypingBubble(),
                   const SizedBox(height: AppSpacing.lg),
                 ],
               ),
             ),
+            // Debug builds only: shows what `/assistant/query` answered.
+            const DiagnosticsPanel(),
             _InputBar(
               controller: _inputController,
               onSend: () => _send(_inputController.text),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A venue and a free hour the assistant found, as a card the player taps
+/// to go straight to that venue on that day.
+class _VenueSuggestionCard extends StatelessWidget {
+  const _VenueSuggestionCard({required this.suggestion, required this.onTap});
+
+  final AssistantSuggestion suggestion;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+    final String? time = suggestion.timeRange;
+    final int? price = suggestion.price;
+    final double? rating = suggestion.rating;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusField),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(AppSpacing.radiusField),
+            border: Border.all(color: AppColors.fieldBorder),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      suggestion.name,
+                      style: textTheme.labelLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (rating != null) ...<Widget>[
+                    const Icon(Icons.star, size: 14, color: AppColors.orange),
+                    const SizedBox(width: 2),
+                    Text(
+                      rating.toStringAsFixed(1),
+                      style: textTheme.labelSmall,
+                    ),
+                  ],
+                ],
+              ),
+              if (suggestion.area.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 2),
+                Row(
+                  children: <Widget>[
+                    const Icon(
+                      Icons.location_on_outlined,
+                      size: 13,
+                      color: AppColors.navy300,
+                    ),
+                    const SizedBox(width: 3),
+                    Expanded(
+                      child: Text(
+                        suggestion.area,
+                        style: textTheme.labelSmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                children: <Widget>[
+                  if (time != null) ...<Widget>[
+                    const Icon(
+                      Icons.schedule,
+                      size: 13,
+                      color: AppColors.navy300,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(time, style: textTheme.labelSmall),
+                    const SizedBox(width: AppSpacing.md),
+                  ],
+                  if (price != null)
+                    Text(
+                      '$price ₪',
+                      style: textTheme.labelMedium?.copyWith(
+                        color: AppColors.orange,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  const Spacer(),
+                  const FixedChevron(pointsLeft: false, size: 16),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The choices an answer offered, as taps rather than retyping.
+class _OptionChips extends StatelessWidget {
+  const _OptionChips({required this.options, required this.onSelected});
+
+  final List<AssistantOption> options;
+  final ValueChanged<AssistantOption> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
+      child: Wrap(
+        spacing: AppSpacing.sm,
+        runSpacing: AppSpacing.sm,
+        children: options
+            .map(
+              (AssistantOption option) => InkWell(
+                onTap: () => onSelected(option),
+                borderRadius: BorderRadius.circular(999),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.orange),
+                  ),
+                  child: Text(
+                    option.label,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          color: AppColors.orange,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -239,24 +528,15 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-/// The circular assistant mark above the greeting.
+/// The waving robot from the design.
 class _AssistantMascot extends StatelessWidget {
   const _AssistantMascot();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 104,
-      height: 104,
-      decoration: BoxDecoration(
-        color: AppColors.successAccent,
-        borderRadius: BorderRadius.circular(32),
-      ),
-      child: const Icon(
-        Icons.smart_toy_outlined,
-        size: 52,
-        color: AppColors.white,
-      ),
+    return const AppIllustration(
+      asset: AppIllustration.assistantRobot,
+      height: 130,
     );
   }
 }
@@ -313,6 +593,83 @@ class _InputBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The chips the assistant offers after a question, so the player can
+
+/// The three-dot bubble shown while the assistant is composing a reply.
+class _TypingBubble extends StatefulWidget {
+  const _TypingBubble();
+
+  @override
+  State<_TypingBubble> createState() => _TypingBubbleState();
+}
+
+class _TypingBubbleState extends State<_TypingBubble>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: AlignmentDirectional.centerEnd,
+      // The dots carry no text, so the meaning is given to assistive
+      // technology explicitly.
+      child: Semantics(
+        label: context.l10n.assistantTyping,
+        child: Container(
+        margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.md,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.navy50,
+          borderRadius: BorderRadius.circular(AppSpacing.md),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (int i = 0; i < 3; i++)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: AnimatedBuilder(
+                  animation: _controller,
+                  builder: (BuildContext context, Widget? child) {
+                    // Each dot lags the one before it, so the row reads as
+                    // a wave rather than a blink.
+                    final double phase = (_controller.value - i * 0.2) % 1.0;
+                    final double lift = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+                    return Opacity(
+                      opacity: 0.35 + lift * 0.65,
+                      child: child,
+                    );
+                  },
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: AppColors.navy500,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        ),
       ),
     );
   }

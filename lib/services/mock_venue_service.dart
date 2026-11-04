@@ -6,16 +6,11 @@ import '../models/venue_details.dart';
 import '../models/venue_filters.dart';
 import 'venue_service.dart';
 
-/// Sample venues used while the venue endpoints are being finished — the
-/// SRS plans for exactly this (1.4: "the prototype relies entirely on mock
-/// data during development and testing").
-///
-/// Selected by `AppConfig.useMockVenues`. Delete this file, and that flag,
-/// once the real endpoints return data.
+/// Sample venues used during development and testing.
 class MockVenueService implements VenueService {
   MockVenueService();
 
-  /// The three facilities the result card shows for every mock venue.
+  /// The three facilities shown on each mock venue card.
   static const List<Amenity> _listAmenities = <Amenity>[
     Amenity(id: 4, name: 'إضاءة', icon: 'lighting'),
     Amenity(id: 1, name: 'موقف سيارات', icon: 'parking'),
@@ -35,6 +30,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_5.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5204,
+      longitude: 34.4367,
     ),
     const Venue(
       id: 2,
@@ -48,6 +45,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_3.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5133,
+      longitude: 34.442,
     ),
     const Venue(
       id: 3,
@@ -61,6 +60,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_4.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5281,
+      longitude: 34.453,
     ),
     const Venue(
       id: 4,
@@ -74,6 +75,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_1.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5311,
+      longitude: 34.427,
     ),
     const Venue(
       id: 5,
@@ -87,6 +90,8 @@ class MockVenueService implements VenueService {
       photos: <String>['assets/venues/venue_2.jpg'],
       isAvailableNow: true,
       amenities: _listAmenities,
+      latitude: 31.5068,
+      longitude: 34.4612,
     ),
   ];
 
@@ -96,6 +101,7 @@ class MockVenueService implements VenueService {
     int page = 1,
   }) async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
+
     return ApiResponse<List<Venue>>(
       success: true,
       message: '',
@@ -104,9 +110,14 @@ class MockVenueService implements VenueService {
   }
 
   @override
-  Future<ApiResponse<VenueDetails>> details(int venueId, {DateTime? date}) async {
+  Future<ApiResponse<VenueDetails>> details(
+    int venueId, {
+    DateTime? date,
+  }) async {
     await Future<void>.delayed(const Duration(milliseconds: 400));
-    final Venue venue = _venues.firstWhere((Venue v) => v.id == venueId);
+
+    final Venue venue =
+        _venues.firstWhere((Venue item) => item.id == venueId);
 
     return ApiResponse<VenueDetails>(
       success: true,
@@ -135,8 +146,7 @@ class MockVenueService implements VenueService {
     );
   }
 
-  /// A plausible day: hourly slots with one already taken, so the booked
-  /// state can be seen without a backend.
+  /// Generates mock hourly slots, including one booked slot.
   List<TimeSlot> _slotsFor(Venue venue) {
     const List<String> hours = <String>[
       '09:00',
@@ -151,6 +161,7 @@ class MockVenueService implements VenueService {
 
     return List<TimeSlot>.generate(hours.length, (int index) {
       final int hour = int.parse(hours[index].substring(0, 2));
+
       return TimeSlot(
         id: venue.id * 100 + index,
         startTime: hours[index],
@@ -162,13 +173,32 @@ class MockVenueService implements VenueService {
   }
 
   @override
+  Future<ApiResponse<List<TimeSlot>>> timeSlots(
+    int venueId, {
+    required DateTime date,
+    required int sportId,
+  }) async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+
+    final ApiResponse<VenueDetails> response =
+        await details(venueId, date: date);
+
+    return ApiResponse<List<TimeSlot>>(
+      success: true,
+      message: '',
+      data: response.data?.timeSlots ?? <TimeSlot>[],
+    );
+  }
+
+  @override
   Future<ApiResponse<List<Venue>>> favorites() async {
     await Future<void>.delayed(const Duration(milliseconds: 300));
-    // Four are hearted by default so the screen has something to show.
+
     final List<Venue> favourites = _venues
         .take(4)
-        .map((Venue v) => v.copyWith(isFavorite: true))
+        .map((Venue venue) => venue.copyWith(isFavorite: true))
         .toList();
+
     return ApiResponse<List<Venue>>(
       success: true,
       message: '',
@@ -181,8 +211,15 @@ class MockVenueService implements VenueService {
     int venueId, {
     required bool isFavorite,
   }) async {
-    final int index = _venues.indexWhere((Venue v) => v.id == venueId);
+    final int index =
+        _venues.indexWhere((Venue venue) => venue.id == venueId);
+
     _venues[index] = _venues[index].copyWith(isFavorite: isFavorite);
-    return ApiResponse<Venue>(success: true, message: '', data: _venues[index]);
+
+    return ApiResponse<Venue>(
+      success: true,
+      message: '',
+      data: _venues[index],
+    );
   }
 }

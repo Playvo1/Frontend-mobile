@@ -10,11 +10,24 @@ class ApiResponse<T> {
     this.data,
     this.errors,
     this.failureDetails,
+    this.statusCode,
+    this.hasMorePages,
   });
 
   final bool success;
   final T? data;
   final String message;
+
+  /// The HTTP status, when the response came from the network. Screens use
+  /// it only where the envelope cannot distinguish two failures — a slot
+  /// already booked (409) from any other rejection.
+  final int? statusCode;
+
+  /// For a paginated list, whether the server has another page. Taken from
+  /// Laravel's `next_page_url`, which is exact — counting the rows only
+  /// guesses, and guesses wrong on a last page that happens to be full.
+  /// Null when the endpoint is not paginated.
+  final bool? hasMorePages;
 
   /// The raw `data` object of a FAILED response. Most failures carry
   /// `"data": null`, but some endpoints attach detail the UI needs — a login
@@ -32,6 +45,7 @@ class ApiResponse<T> {
   factory ApiResponse.fromJson(
     Map<String, dynamic> json, {
     T Function(dynamic data)? parseData,
+    int? statusCode,
   }) {
     final dynamic rawData = json['data'];
     final bool success = json['success'] as bool? ?? false;
@@ -48,8 +62,17 @@ class ApiResponse<T> {
       failureDetails:
           (!success && rawData is Map<String, dynamic>) ? rawData : null,
       errors: _parseErrors(json['errors']),
+      statusCode: statusCode,
+      hasMorePages: rawData is Map<String, dynamic> &&
+              rawData.containsKey('next_page_url')
+          ? rawData['next_page_url'] != null
+          : null,
     );
   }
+
+  /// True when the server refused because the resource was taken between
+  /// the player opening the form and submitting it.
+  bool get isConflict => statusCode == 409;
 
   /// Convenience for building a failure locally (e.g. from a caught
   /// exception) without inventing a different shape.

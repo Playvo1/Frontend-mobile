@@ -11,8 +11,10 @@ import '../../services/venue_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_bottom_nav.dart';
+import '../../widgets/assistant_fab.dart';
 import '../../widgets/error_banner.dart';
 import '../../widgets/home_search_field.dart';
+import '../../widgets/infinite_scroll.dart';
 import '../../widgets/venue_result_card.dart';
 import '../home/venue_filter_sheet.dart';
 
@@ -42,6 +44,12 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
 
   late VenueFilters _filters = widget.initialFilters;
   List<Venue> _venues = <Venue>[];
+
+  /// Paging state. [_hasMore] goes false when a page comes back short,
+  /// which is the only signal the envelope gives.
+  int _page = 1;
+  bool _hasMore = true;
+  bool _isLoadingMore = false;
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -61,6 +69,8 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _page = 1;
+      _hasMore = true;
     });
 
     try {
@@ -70,7 +80,11 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
         return;
       }
       if (response.success) {
-        setState(() => _venues = response.data ?? <Venue>[]);
+        final List<Venue> venues = response.data ?? <Venue>[];
+        setState(() {
+          _venues = venues;
+          _hasMore = response.hasMorePages ?? venues.length >= _pageSize;
+        });
         return;
       }
       setState(() => _errorMessage = response.message);
@@ -88,10 +102,50 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
     }
   }
 
+  /// How many results a full page holds. A page that comes back shorter
+  /// than this is the last one.
+  static const int _pageSize = 10;
+
+  /// Appends the next page. Failures here are quiet: the list the player
+  /// already has stays usable, and scrolling again retries.
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore || _isLoading) {
+      return;
+    }
+    setState(() => _isLoadingMore = true);
+
+    try {
+      final ApiResponse<List<Venue>> response =
+          await _venueService.search(_filters, page: _page + 1);
+      if (!mounted) {
+        return;
+      }
+      final List<Venue> next = response.data ?? <Venue>[];
+      setState(() {
+        if (response.success) {
+          _page += 1;
+          _venues = <Venue>[..._venues, ...next];
+        }
+        _hasMore = response.success &&
+            (response.hasMorePages ?? next.length >= _pageSize);
+      });
+    } on ApiException {
+      if (mounted) {
+        // Stop asking until the player pulls to refresh; retrying on every
+        // scroll frame would hammer a server that is already struggling.
+        setState(() => _hasMore = false);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingMore = false);
+      }
+    }
+  }
+
   Future<void> _openFilters() async {
     final VenueFilters? applied =
         await VenueFilterSheet.show(context, _filters);
-    if (applied == null) {
+    if (applied == null || !mounted) {
       return;
     }
     setState(() => _filters = applied);
@@ -141,6 +195,9 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
       backgroundColor: AppColors.grey100,
       // The design reaches this screen from Home, so Home stays the active
       // tab rather than switching to Explore.
+      floatingActionButtonLocation:
+          FloatingActionButtonLocation.startFloat,
+      floatingActionButton: const AssistantFab(),
       bottomNavigationBar: AppBottomNav(
         current: AppTab.home,
         onSelected: (AppTab tab) => AppRouter.switchTab(context, tab),
@@ -219,9 +276,12 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
+    return InfiniteScroll(
+      canLoadMore: _hasMore && !_isLoadingMore,
+      onLoadMore: _loadMore,
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.screenHorizontal,
           0,
@@ -246,9 +306,16 @@ class _VenueSearchScreenState extends State<VenueSearchScreen> {
               venue: venue,
               onTap: () => AppRouter.toVenueDetails(context, venue.id),
               onToggleFavorite: () => _toggleFavorite(venue),
+              onShowOnMap: () => AppRouter.toVenueMap(
+                context,
+                filters: _filters,
+                focusedVenueId: venue.id,
+              ),
             ),
           ),
-        ],
+          LoadMoreFooter(isLoading: _isLoadingMore),
+          ],
+        ),
       ),
     );
   }
@@ -407,7 +474,10 @@ class _BarButton extends StatelessWidget {
           color: AppColors.white.withValues(alpha: 0.12),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 20, color: AppColors.white),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Icon(icon, size: 20, color: AppColors.white),
+        ),
       ),
     );
   }

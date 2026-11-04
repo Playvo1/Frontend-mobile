@@ -14,11 +14,10 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
 import '../../widgets/app_back_button.dart';
 import '../../widgets/app_bottom_nav.dart';
-import '../../widgets/back_circle_button.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/booking_stepper.dart';
 import '../../widgets/booking_summary_card.dart';
 import '../../widgets/error_banner.dart';
-import '../../widgets/playvo_logo.dart';
 
 /// Step 1 of 3: who is booking. Creating the booking here returns its id,
 /// which step 2 needs to attach the payment receipt to.
@@ -48,7 +47,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   late final BookingService _bookingService =
       widget.bookingService ?? BookingService.create();
 
-  String? _role;
   bool _isSubmitting = false;
   String? _errorMessage;
 
@@ -73,7 +71,10 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       final ApiResponse<Booking> response = await _bookingService.createBooking(
         timeSlotId: widget.slot.id,
         captainName: _nameController.text.trim(),
-        captainRole: _role!,
+        // The form no longer asks: whoever makes the booking is its
+        // captain. The field stays in the request because the endpoint
+        // validates it as required.
+        captainRole: CaptainRole.captain,
         captainPhone: _phoneController.text.trim(),
       );
 
@@ -89,6 +90,13 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           slot: widget.slot,
           date: widget.date,
         );
+        return;
+      }
+      // A slot taken between opening the form and submitting it is not a
+      // form error — the player has to pick a different time, so it gets
+      // its own dialog rather than a line of red text.
+      if (response.isConflict) {
+        await _showSlotTaken();
         return;
       }
       setState(
@@ -109,16 +117,24 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     }
   }
 
-  String _roleLabel(String role, AppLocalizations l10n) {
-    switch (role) {
-      case CaptainRole.captain:
-        return l10n.roleCaptain;
-      case CaptainRole.player:
-        return l10n.rolePlayer;
-      default:
-        return l10n.roleOrganizer;
+  /// Explains that the slot went and sends the player back to the grid.
+  Future<void> _showSlotTaken() async {
+    final AppLocalizations l10n = context.l10n;
+    await ConfirmDialog.show(
+      context,
+      icon: Icons.event_busy_outlined,
+      title: l10n.slotTakenTitle,
+      body: l10n.slotTakenBody,
+      confirmLabel: l10n.pickAnotherTime,
+      cancelLabel: l10n.cancel,
+    );
+    if (mounted) {
+      // Either answer leads back to the venue page: the booking cannot
+      // continue against a slot that is gone.
+      Navigator.of(context).pop();
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -186,35 +202,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   ),
                 ),
                 validator: (String? value) => Validators.fullName(value, l10n),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              _FieldLabel(label: l10n.roleLabel),
-              DropdownButtonFormField<String>(
-                initialValue: _role,
-                isExpanded: true,
-                hint: Text(l10n.rolePlaceholder, style: textTheme.bodySmall),
-                icon: const Icon(
-                  Icons.keyboard_arrow_down,
-                  color: AppColors.navy300,
-                ),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(
-                    Icons.groups_outlined,
-                    size: 19,
-                    color: AppColors.navy300,
-                  ),
-                ),
-                items: CaptainRole.all
-                    .map(
-                      (String role) => DropdownMenuItem<String>(
-                        value: role,
-                        child: Text(_roleLabel(role, l10n)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (String? role) => setState(() => _role = role),
-                validator: (String? value) =>
-                    value == null ? l10n.roleRequired : null,
               ),
               const SizedBox(height: AppSpacing.md),
               _FieldLabel(label: l10n.phoneLabel),
@@ -303,9 +290,6 @@ class BookingHeader extends StatelessWidget {
             ),
           ],
         ),
-        // A small explicit gap: the proportional default tucks the
-        // wordmark too close to the mark at this size.
-        const PlayvoLogo(markHeight: 44, wordmarkSize: 13, gap: -3),
         const AppBackButton(size: 34),
       ],
     );

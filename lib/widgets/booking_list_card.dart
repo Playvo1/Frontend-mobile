@@ -19,11 +19,18 @@ class BookingListCard extends StatelessWidget {
     required this.booking,
     required this.onViewDetails,
     required this.onCancel,
+    required this.onRate,
+    required this.onShare,
   });
 
   final Booking booking;
   final VoidCallback onViewDetails;
   final VoidCallback onCancel;
+
+  /// Shown only once the game is over and no rating has been sent.
+  final VoidCallback onRate;
+
+  final VoidCallback onShare;
 
   @override
   Widget build(BuildContext context) {
@@ -46,9 +53,23 @@ class BookingListCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: <Widget>[
               _StatusBadge(status: booking.status),
-              // Reads right to left: label, number, then the icon.
+              // Reads right to left: label, number, then the icon, with
+              // the share action trailing.
               Row(
                 children: <Widget>[
+                  InkWell(
+                    onTap: onShare,
+                    borderRadius: BorderRadius.circular(6),
+                    child: const Padding(
+                      padding: EdgeInsets.all(3),
+                      child: Icon(
+                        Icons.ios_share,
+                        size: 17,
+                        color: AppColors.navy500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
                   Text(
                     l10n.bookingNumber,
                     style: textTheme.labelSmall?.copyWith(fontSize: 11),
@@ -149,6 +170,45 @@ class BookingListCard extends StatelessWidget {
                 ),
               ],
             )
+          else if (booking.awaitsRating)
+            // A finished game asks to be rated (FR-13); the prompt
+            // disappears once a rating has been sent.
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onViewDetails,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                    child: Text(l10n.viewDetails),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: onRate,
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: <Widget>[
+                        const Icon(Icons.star_rounded, size: 17),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            l10n.rateVenue,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            )
           else
             OutlinedButton(
               onPressed: onViewDetails,
@@ -190,6 +250,16 @@ class _StatusBadge extends StatelessWidget {
         color = AppColors.statusCancelled;
         background = AppColors.statusCancelledBackground;
         icon = Icons.close;
+        break;
+      // A booking whose receipt the admin has not verified yet is NOT the
+      // same as a confirmed one, and must not look like it: the slot is
+      // only held, so "قادم" would promise a reservation the player does
+      // not have.
+      case BookingStatus.pending:
+        label = l10n.statusAwaitingApproval;
+        color = AppColors.warning;
+        background = AppColors.orange50;
+        icon = Icons.hourglass_top_rounded;
         break;
       default:
         label = l10n.statusUpcoming;

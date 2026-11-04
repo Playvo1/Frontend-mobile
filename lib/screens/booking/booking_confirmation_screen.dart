@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/app_router.dart';
+import '../../core/booking_share.dart';
 import '../../l10n/l10n.dart';
 import '../../models/booking.dart';
 import '../../models/time_slot.dart';
@@ -66,14 +67,19 @@ class BookingConfirmationScreen extends StatelessWidget {
             const SizedBox(height: AppSpacing.lg),
             const BookingStepper(current: BookingStep.confirmation),
             const SizedBox(height: AppSpacing.xl),
-            const Center(child: SuccessMark()),
+            // Amber, not a green tick: the receipt has been received but an
+            // admin still has to verify it, and the slot is only held until
+            // then. A tick here reads as "paid and booked".
+            const Center(child: SuccessMark.pending()),
             const SizedBox(height: AppSpacing.lg),
             Text(
               l10n.bookingConfirmedTitleFull,
               textAlign: TextAlign.center,
               style: textTheme.headlineSmall,
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: AppSpacing.sm),
+            const Center(child: _AwaitingApprovalPill()),
+            const SizedBox(height: AppSpacing.sm),
             Text(
               l10n.bookingConfirmedSubtitle,
               textAlign: TextAlign.center,
@@ -98,6 +104,25 @@ class BookingConfirmationScreen extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             const _ImportantNotes(),
             const SizedBox(height: AppSpacing.xl),
+            OutlinedButton(
+              onPressed: () async {
+                final bool shared = await BookingShare.share(booking, l10n);
+                if (!shared && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(l10n.shareUnavailable)),
+                  );
+                }
+              },
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  const Icon(Icons.ios_share, size: 17),
+                  const SizedBox(width: AppSpacing.sm),
+                  Text(l10n.shareBooking),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
             ElevatedButton(
               onPressed: () => AppRouter.switchTab(context, AppTab.bookings),
               child: Row(
@@ -130,6 +155,50 @@ class BookingConfirmationScreen extends StatelessWidget {
 }
 
 /// The green strip confirming the receipt arrived.
+/// "بانتظار تأكيد الإدارة" — the one element that states the booking's real
+/// standing, placed directly under the title where the eye lands first.
+class _AwaitingApprovalPill extends StatelessWidget {
+  const _AwaitingApprovalPill();
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.orange50,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.orange100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const Icon(
+            Icons.schedule_rounded,
+            size: 15,
+            color: AppColors.warning,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            context.l10n.bookingAwaitingApproval,
+            style: textTheme.labelMedium?.copyWith(
+              color: AppColors.warning,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The receipt arrived; the money has not been verified. The box is amber
+/// for that reason — a green tick next to "payment" claims the transfer
+/// cleared, which is the one thing this screen cannot say yet.
 class _PaymentReceivedBox extends StatelessWidget {
   const _PaymentReceivedBox();
 
@@ -141,10 +210,11 @@ class _PaymentReceivedBox extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.successBackground,
+        color: AppColors.orange50,
         borderRadius: BorderRadius.circular(AppSpacing.radiusField),
+        border: Border.all(color: AppColors.orange100),
       ),
-      // The tick leads the row, which puts it on the right in Arabic.
+      // The icon leads the row, which puts it on the right in Arabic.
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -152,10 +222,14 @@ class _PaymentReceivedBox extends StatelessWidget {
             width: 24,
             height: 24,
             decoration: const BoxDecoration(
-              color: AppColors.success,
+              color: AppColors.warning,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check, size: 15, color: AppColors.white),
+            child: const Icon(
+              Icons.upload_file_rounded,
+              size: 14,
+              color: AppColors.white,
+            ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -165,7 +239,7 @@ class _PaymentReceivedBox extends StatelessWidget {
                 Text(
                   l10n.paymentConfirmedTitle,
                   style: textTheme.labelMedium?.copyWith(
-                    color: AppColors.success,
+                    color: AppColors.warning,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -173,6 +247,14 @@ class _PaymentReceivedBox extends StatelessWidget {
                 Text(
                   l10n.paymentConfirmedBody,
                   style: textTheme.labelSmall?.copyWith(height: 1.6),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.bookingNotConfirmedYet,
+                  style: textTheme.labelSmall?.copyWith(
+                    height: 1.6,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -284,20 +366,22 @@ class _ImportantNotes extends StatelessWidget {
           for (final String note in notes)
             Padding(
               padding: const EdgeInsets.only(bottom: 6),
+              // The bullet comes first, which puts it on the right of the
+              // line in Arabic.
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  const Padding(
+                    padding: EdgeInsets.only(top: 7, right: 2, left: 7),
+                    child: CircleAvatar(
+                      radius: 2.5,
+                      backgroundColor: AppColors.navy300,
+                    ),
+                  ),
                   Expanded(
                     child: Text(
                       note,
                       style: textTheme.labelSmall?.copyWith(height: 1.6),
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6, right: 6, left: 6),
-                    child: CircleAvatar(
-                      radius: 2,
-                      backgroundColor: AppColors.navy300,
                     ),
                   ),
                 ],

@@ -66,14 +66,14 @@ class PreviewAuthService {
         statusCode: 423,
       );
 
-  /// A signed-in player, for the placeholder home screen.
+  /// A signed-in player, used by the account screen in the gallery.
   static AuthService get signedIn => answering(<String, dynamic>{
         'success': true,
         'data': <String, dynamic>{
           'id': 41,
           'name': 'عمر يوسف',
           'email': 'omar@example.com',
-          'phone': '0599123456',
+          'phone': '+970 59 123 4567',
           'roles': <String>['player'],
           'status': 'active',
         },

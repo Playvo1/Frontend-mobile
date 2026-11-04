@@ -22,6 +22,21 @@ class TimeSlotGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A day the venue published no hours for renders as a blank gap
+    // otherwise, which reads as a broken screen rather than a full day.
+    if (slots.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxl),
+        child: Center(
+          child: Text(
+            context.l10n.noSlotsForDay,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ),
+      );
+    }
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),

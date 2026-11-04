@@ -11,6 +11,7 @@ import '../../models/venue_details.dart';
 import '../../services/venue_service.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_spacing.dart';
+import '../../widgets/fixed_chevron.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/date_strip.dart';
 import '../../widgets/error_banner.dart';
@@ -18,19 +19,20 @@ import '../../widgets/time_slot_grid.dart';
 import '../../widgets/venue_photo.dart';
 
 /// The venue page: gallery, description, amenities, and the day's slots.
-///
-/// The slots are refetched whenever the date changes, because availability
-/// is per day and stale slots would let a player pick an hour the server
-/// has already given away.
 class VenueDetailsScreen extends StatefulWidget {
   const VenueDetailsScreen({
     super.key,
     required this.venueId,
     this.venueService,
+    this.initialDate,
   });
 
   final int venueId;
   final VenueService? venueService;
+
+  /// The day the slot grid opens on. Null means today — an assistant
+  /// suggestion passes the day it offered, so the hour is already there.
+  final DateTime? initialDate;
 
   @override
   State<VenueDetailsScreen> createState() => _VenueDetailsScreenState();
@@ -47,7 +49,7 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
   int _galleryIndex = 0;
   int? _selectedSlotId;
 
-  late DateTime _selectedDate = _today;
+  late DateTime _selectedDate = widget.initialDate ?? _today;
   late DateTime _stripStart = _today;
 
   static DateTime get _today {
@@ -68,33 +70,74 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
     });
 
     try {
-      final ApiResponse<VenueDetails> response = await _venueService.details(
+      final ApiResponse<VenueDetails> response =
+          await _venueService.details(
         widget.venueId,
         date: _selectedDate,
       );
+
       if (!mounted) {
         return;
       }
+
       if (response.success) {
         setState(() {
           _details = response.data;
-          // A slot id from the previous day means nothing on this one.
           _selectedSlotId = null;
         });
+
+        await _loadSlots();
         return;
       }
+
       setState(() => _errorMessage = response.message);
     } on ApiException catch (exception) {
       if (!mounted) {
         return;
       }
+
       setState(
-        () => _errorMessage = FailureMessages.of(exception, context.l10n),
+        () => _errorMessage = FailureMessages.of(
+          exception,
+          context.l10n,
+        ),
       );
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  /// Reads the day's slots from GET /venues/{id}/time-slots.
+  Future<void> _loadSlots() async {
+    try {
+      final ApiResponse<List<TimeSlot>> response =
+          await _venueService.timeSlots(
+        widget.venueId,
+        date: _selectedDate,
+        sportId: 1,
+      );
+
+      final VenueDetails? current = _details;
+
+      if (!mounted || current == null || !response.success) {
+        return;
+      }
+
+      final List<TimeSlot> fetched =
+          response.data ?? <TimeSlot>[];
+
+      // Preserve the venue's existing slots if the endpoint returns none.
+      if (fetched.isEmpty && current.timeSlots.isNotEmpty) {
+        return;
+      }
+
+      setState(
+        () => _details = current.copyWith(timeSlots: fetched),
+      );
+    } on ApiException {
+      // Keep showing venue details if availability cannot be fetched.
     }
   }
 
@@ -109,7 +152,7 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
       _stripStart.month,
       _stripStart.day + direction * 5,
     );
-    // Never walk back past today: those days cannot be booked.
+
     setState(
       () => _stripStart = shifted.isBefore(_today) ? _today : shifted,
     );
@@ -118,9 +161,12 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
   void _continueToBooking() {
     final VenueDetails? details = _details;
     final int? slotId = _selectedSlotId;
+
     if (details == null || slotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.selectSlotFirst)),
+        SnackBar(
+          content: Text(context.l10n.selectSlotFirst),
+        ),
       );
       return;
     }
@@ -128,7 +174,9 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
     AppRouter.toBookingDetails(
       context,
       venue: details.venue,
-      slot: details.timeSlots.firstWhere((TimeSlot s) => s.id == slotId),
+      slot: details.timeSlots.firstWhere(
+        (TimeSlot slot) => slot.id == slotId,
+      ),
       date: _selectedDate,
     );
   }
@@ -147,10 +195,14 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
       body: SafeArea(
         bottom: false,
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(
+                child: CircularProgressIndicator(),
+              )
             : details == null
                 ? Padding(
-                    padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
+                    padding: const EdgeInsets.all(
+                      AppSpacing.screenHorizontal,
+                    ),
                     child: ErrorBanner(message: _errorMessage),
                   )
                 : _buildContent(l10n, details),
@@ -158,7 +210,10 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
     );
   }
 
-  Widget _buildContent(AppLocalizations l10n, VenueDetails details) {
+  Widget _buildContent(
+    AppLocalizations l10n,
+    VenueDetails details,
+  ) {
     final TextTheme textTheme = Theme.of(context).textTheme;
 
     return ListView(
@@ -168,7 +223,9 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
           photos: details.photos,
           index: _galleryIndex,
           isFavorite: details.venue.isFavorite,
-          onIndexChanged: (int index) => setState(() => _galleryIndex = index),
+          onIndexChanged: (int index) {
+            setState(() => _galleryIndex = index);
+          },
         ),
         Padding(
           padding: const EdgeInsets.all(AppSpacing.screenHorizontal),
@@ -185,7 +242,9 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
-                  _PriceBadge(price: details.venue.hourlyPrice),
+                  _PriceBadge(
+                    price: details.venue.hourlyPrice,
+                  ),
                 ],
               ),
               const SizedBox(height: 5),
@@ -208,7 +267,9 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
                 children: <Widget>[
                   Text(
                     l10n.reviewsCount(details.venue.reviewCount),
-                    style: textTheme.labelSmall?.copyWith(fontSize: 11),
+                    style: textTheme.labelSmall?.copyWith(
+                      fontSize: 11,
+                    ),
                   ),
                   const SizedBox(width: 5),
                   Text(
@@ -231,7 +292,9 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   details.description,
-                  style: textTheme.labelSmall?.copyWith(height: 1.7),
+                  style: textTheme.labelSmall?.copyWith(
+                    height: 1.7,
+                  ),
                 ),
               ],
               const SizedBox(height: AppSpacing.lg),
@@ -261,8 +324,9 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
                   const SizedBox(width: 6),
                   Text(
                     l10n.availableTime,
-                    style: textTheme.labelMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
+                    style: textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
@@ -270,8 +334,9 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
               TimeSlotGrid(
                 slots: details.timeSlots,
                 selectedId: _selectedSlotId,
-                onSelected: (TimeSlot slot) =>
-                    setState(() => _selectedSlotId = slot.id),
+                onSelected: (TimeSlot slot) {
+                  setState(() => _selectedSlotId = slot.id);
+                },
               ),
               ErrorBanner(message: _errorMessage),
               const SizedBox(height: AppSpacing.xl),
@@ -294,15 +359,15 @@ class _VenueDetailsScreenState extends State<VenueDetailsScreen> {
       firstDate: _today,
       lastDate: _today.add(const Duration(days: 90)),
     );
-    if (picked != null) {
+
+    if (picked != null && mounted) {
       setState(() => _stripStart = picked);
       await _selectDate(picked);
     }
   }
 }
 
-/// The photo header with its thumbnail strip and the back, share and
-/// favourite buttons.
+/// The photo header with thumbnails and action buttons.
 class _Gallery extends StatelessWidget {
   const _Gallery({
     required this.photos,
@@ -318,7 +383,8 @@ class _Gallery extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String? current = photos.isEmpty ? null : photos[index];
+    final String? current =
+        photos.isEmpty ? null : photos[index];
 
     return Column(
       children: <Widget>[
@@ -329,12 +395,11 @@ class _Gallery extends StatelessWidget {
               width: double.infinity,
               child: VenuePhoto(
                 url: current,
-                borderRadius: BorderRadius.circular(AppSpacing.radiusField),
+                borderRadius: BorderRadius.circular(
+                  AppSpacing.radiusField,
+                ),
               ),
             ),
-            // The design keeps the back chevron on the left of the photo
-            // and the two actions on the right, so they are pinned by
-            // physical side rather than by reading direction.
             Positioned(
               top: AppSpacing.md,
               left: AppSpacing.md,
@@ -346,16 +411,19 @@ class _Gallery extends StatelessWidget {
             Positioned(
               top: AppSpacing.md,
               right: AppSpacing.md,
-              // The heart is the outermost button on the right, with share
-              // to its left.
               child: Row(
                 children: <Widget>[
                   _RoundButton(
-                    icon: isFavorite ? Icons.favorite : Icons.favorite_border,
+                    icon: isFavorite
+                        ? Icons.favorite
+                        : Icons.favorite_border,
                     onPressed: () {},
                   ),
                   const SizedBox(width: AppSpacing.sm),
-                  _RoundButton(icon: Icons.share_outlined, onPressed: () {}),
+                  _RoundButton(
+                    icon: Icons.share_outlined,
+                    onPressed: () {},
+                  ),
                 ],
               ),
             ),
@@ -370,7 +438,9 @@ class _Gallery extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.navy900.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(AppSpacing.sm),
+                    borderRadius: BorderRadius.circular(
+                      AppSpacing.sm,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -408,9 +478,12 @@ class _Gallery extends StatelessWidget {
   }
 }
 
-/// A white circular button used over the gallery photo.
+/// A white circular button displayed over the gallery photo.
 class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.onPressed});
+  const _RoundButton({
+    required this.icon,
+    required this.onPressed,
+  });
 
   final IconData icon;
   final VoidCallback onPressed;
@@ -427,13 +500,20 @@ class _RoundButton extends StatelessWidget {
           color: AppColors.white,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, size: 19, color: AppColors.navy900),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: Icon(
+            icon,
+            size: 19,
+            color: AppColors.navy900,
+          ),
+        ),
       ),
     );
   }
 }
 
-/// The orange "50 ₪ / ساعة" pill above the venue name.
+/// The venue's hourly price badge.
 class _PriceBadge extends StatelessWidget {
   const _PriceBadge({required this.price});
 
@@ -478,9 +558,6 @@ class _Amenities extends StatelessWidget {
 
   final List<Amenity> amenities;
 
-  /// Maps the API's icon keys onto Material icons. An unknown key gets a
-  /// neutral tick rather than a blank tile, so the backend can add an
-  /// amenity without waiting for an app release.
   static IconData _iconFor(String? key) {
     switch (key) {
       case 'parking':
@@ -511,9 +588,11 @@ class _Amenities extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: amenities.length,
-        separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.sm),
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: AppSpacing.sm),
         itemBuilder: (BuildContext context, int index) {
           final Amenity amenity = amenities[index];
+
           return Container(
             width: 74,
             padding: const EdgeInsets.all(AppSpacing.sm),
@@ -535,7 +614,10 @@ class _Amenities extends StatelessWidget {
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 9, color: AppColors.navy500),
+                  style: const TextStyle(
+                    fontSize: 9,
+                    color: AppColors.navy500,
+                  ),
                 ),
               ],
             ),
@@ -567,14 +649,17 @@ class _SectionRow extends StatelessWidget {
       children: <Widget>[
         Row(
           children: <Widget>[
-            Icon(icon, size: 15, color: AppColors.navy500),
+            Icon(
+              icon,
+              size: 15,
+              color: AppColors.navy500,
+            ),
             const SizedBox(width: 6),
             Text(
               title,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
             ),
           ],
         ),
@@ -584,13 +669,12 @@ class _SectionRow extends StatelessWidget {
             children: <Widget>[
               Text(
                 actionLabel,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: AppColors.orange500, fontSize: 11),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.orange500,
+                      fontSize: 11,
+                    ),
               ),
-              const Icon(
-                Icons.chevron_left,
+              const FixedChevron(
                 size: 14,
                 color: AppColors.orange500,
               ),
@@ -602,8 +686,7 @@ class _SectionRow extends StatelessWidget {
   }
 }
 
-/// Four thumbnails and, when there are more photos, a navy "+N" tile that
-/// stands for the rest.
+/// Four thumbnails and a "+N" tile when more photos exist.
 class _Thumbnails extends StatelessWidget {
   const _Thumbnails({
     required this.photos,
@@ -662,7 +745,9 @@ class _Thumbnails extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       color: AppColors.navy900,
-                      borderRadius: BorderRadius.circular(AppSpacing.sm),
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.sm,
+                      ),
                     ),
                     child: Center(
                       child: Text(

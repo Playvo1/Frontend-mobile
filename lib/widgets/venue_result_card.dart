@@ -16,11 +16,15 @@ class VenueResultCard extends StatelessWidget {
     required this.venue,
     required this.onTap,
     required this.onToggleFavorite,
+    required this.onShowOnMap,
   });
 
   final Venue venue;
   final VoidCallback onTap;
   final VoidCallback onToggleFavorite;
+
+  /// Opens the map centred on this venue.
+  final VoidCallback onShowOnMap;
 
   @override
   Widget build(BuildContext context) {
@@ -92,12 +96,30 @@ class VenueResultCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        Text(
-                          venue.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                venue.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.labelLarge
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: onShowOnMap,
+                              borderRadius: BorderRadius.circular(6),
+                              child: const Padding(
+                                padding: EdgeInsets.all(3),
+                                child: Icon(
+                                  Icons.map_outlined,
+                                  size: 19,
+                                  color: AppColors.navy900,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Row(
